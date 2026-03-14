@@ -2,7 +2,11 @@
 
 Turn any URL into a dual-host research podcast with editable brief and script.
 
-![Research Podcast Studio](docs/screenshot.png)
+![Research Podcast Studio](https://raw.githubusercontent.com/adrianhensler/podcast-generator/main/docs/screenshot.png)
+
+### Example output
+
+[Halifax, Nova Scotia — example podcast episode](docs/example.mp3)
 
 ## Quick Start
 
