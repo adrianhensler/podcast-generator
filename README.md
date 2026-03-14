@@ -4,9 +4,11 @@ Turn any URL into a dual-host research podcast with editable brief and script.
 
 <img src="https://raw.githubusercontent.com/adrianhensler/podcast-generator/main/docs/screenshot.png" width="800" />
 
-### Example output
+### 🎧 Example output
 
-[Halifax, Nova Scotia — example podcast episode](docs/example.mp3)
+**[▶ Listen: Halifax, Nova Scotia — AI-generated podcast episode](https://github.com/adrianhensler/podcast-generator/raw/main/docs/example.mp3)**
+
+> Generated from the Halifax, Nova Scotia Wikipedia article with Tavily search augmentation. Two hosts, medium length, neutral tone.
 
 ## Quick Start
 
