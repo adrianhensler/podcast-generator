@@ -2,6 +2,8 @@
 
 Turn any URL into a dual-host research podcast with editable brief and script.
 
+<img src="https://raw.githubusercontent.com/adrianhensler/podcast-generator/main/docs/podcast-generator-hero-v3.png" width="800" alt="Podcast Generator product hero" />
+
 <img src="https://raw.githubusercontent.com/adrianhensler/podcast-generator/main/docs/screenshot.png" width="800" />
 
 ### 🎧 Example output
