@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Research Podcast Studio{% endblock %}
+{% block content %}
+<div class="home-wrap">
+
+  <header class="home-hero">
+    <p class="hero-eyebrow">Research Podcast Studio</p>
+    <h1 class="hero-heading">Turn any article<br><em>into a podcast.</em></h1>
+    <p class="hero-sub">Paste a URL. Get a researched brief, a dual-host script, and rendered audio.</p>
+  </header>
+
+  <form class="home-form" action="/projects" method="POST">
+
+    <div class="url-field">
+      <input
+        type="url"
+        name="url"
+        placeholder="https://paste-any-article-url-here.com/…"
+        required
+        autofocus
+        class="url-input"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button type="submit" class="btn-generate">
+        Generate
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="form-options">
+
+      <div class="opt-group">
+        <span class="opt-label">Speakers</span>
+        <div class="pill-group">
+          <label class="pill"><input type="radio" name="num_speakers" value="1"><span>Solo</span></label>
+          <label class="pill"><input type="radio" name="num_speakers" value="2" checked><span>Dual host</span></label>
+        </div>
+      </div>
+
+      <div class="opt-divider"></div>
+
+      <div class="opt-group">
+        <span class="opt-label">Tone</span>
+        <div class="pill-group">
+          <label class="pill"><input type="radio" name="tone" value="positive"><span>Positive</span></label>
+          <label class="pill"><input type="radio" name="tone" value="neutral" checked><span>Neutral</span></label>
+          <label class="pill"><input type="radio" name="tone" value="negative"><span>Critical</span></label>
+        </div>
+      </div>
+
+      <div class="opt-divider"></div>
+
+      <div class="opt-group">
+        <span class="opt-label">Length</span>
+        <div class="pill-group">
+          <label class="pill"><input type="radio" name="length" value="short"><span>Short</span></label>
+          <label class="pill"><input type="radio" name="length" value="medium" checked><span>Medium</span></label>
+          <label class="pill"><input type="radio" name="length" value="long"><span>Long</span></label>
+        </div>
+      </div>
+
+      <div class="opt-divider"></div>
+
+      <div class="opt-group">
+        <span class="opt-label">Voices</span>
+        <div class="voice-selects">
+          {% set voices = ["Wise_Woman","Friendly_Person","Inspirational_girl","Deep_Voice_Man","Calm_Woman","Casual_Guy","Lively_Girl","Patient_Man","Young_Knight","Determined_Man","Lovely_Girl","Decent_Boy","Imposing_Manner","Elegant_Man","Abbess","Sparkling_Girl","Interesting_Man"] %}
+          <select name="host_a_voice" class="voice-select">
+            {% for v in voices %}
+            <option value="{{ v }}" {% if v == "Wise_Woman" %}selected{% endif %}>A: {{ v.replace("_", " ") }}</option>
+            {% endfor %}
+          </select>
+          <select name="host_b_voice" class="voice-select">
+            {% for v in voices %}
+            <option value="{{ v }}" {% if v == "Deep_Voice_Man" %}selected{% endif %}>B: {{ v.replace("_", " ") }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="opt-divider"></div>
+
+      <div class="opt-group">
+        <label class="pill tavily-pill">
+          <input type="checkbox" name="use_tavily" value="true">
+          <span>Tavily search</span>
+        </label>
+      </div>
+
+    </div>
+  </form>
+
+</div>
+{% endblock %}

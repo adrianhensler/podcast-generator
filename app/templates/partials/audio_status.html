@@ -1,0 +1,22 @@
+<div id="audio-status"
+  {% if project.status == "rendering" %}
+  hx-get="/projects/{{ project.id }}/status/audio"
+  hx-trigger="every 3s"
+  hx-swap="outerHTML"
+  {% endif %}>
+  {% if project.status == "done" %}
+  <div class="audio-controls">
+    <a href="/projects/{{ project.id }}/audio" download class="btn-ghost">Download MP3</a>
+  </div>
+  <div class="audio-wrap">
+    <audio controls class="audio-player" src="/projects/{{ project.id }}/audio" preload="metadata">
+      Your browser does not support audio playback.
+    </audio>
+  </div>
+  {% elif project.status == "rendering" %}
+  <div class="status-bar status-live">
+    <span class="status-dot-anim live"></span>
+    Rendering audio segments… this may take a few minutes.
+  </div>
+  {% endif %}
+</div>

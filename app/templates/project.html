@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title or project.url }} — Podcast Studio{% endblock %}
+{% block body_attrs %} data-project-id="{{ project.id }}" data-project-status="{{ project.status }}"{% if project.error_message %} data-project-error="{{ project.error_message | e }}"{% endif %}{% endblock %}
+{% block content %}
+<div class="project-page">
+
+  <div class="project-header">
+    <div>
+      <h2 class="project-title">{{ project.title or project.url }}</h2>
+      <a href="{{ project.url }}" target="_blank" class="project-url">{{ project.url }}</a>
+    </div>
+    <div class="project-meta-right">
+      {% if project.total_tokens > 0 %}
+      <span class="meta-chip">{{ "{:,}".format(project.total_tokens) }} tokens</span>
+      <span class="meta-chip accent">${{ "%.4f"|format(project.estimated_cost_usd) }}</span>
+      {% endif %}
+      <span class="status-pill status-{{ project.status }}">{{ project.status.replace('_', ' ') }}</span>
+    </div>
+  </div>
+
+  <!-- Progress strip -->
+  {% set brief_active = project.status in ['ingesting','brief_pending','brief_streaming','brief_ready','scripting','script_outline','script_streaming','script_ready','rendering','done'] %}
+  {% set brief_done   = project.status in ['brief_ready','scripting','script_outline','script_streaming','script_ready','rendering','done'] %}
+  {% set script_active = project.status in ['scripting','script_outline','script_streaming','script_ready','rendering','done'] %}
+  {% set script_done   = project.status in ['script_ready','rendering','done'] %}
+  {% set audio_active  = project.status in ['rendering','done'] %}
+  {% set audio_done    = project.status == 'done' %}
+  <div class="progress-strip">
+    <div class="prog-step {% if brief_active %}active{% endif %} {% if brief_done %}done{% endif %}">
+      <span class="prog-num">01</span>
+      <span class="prog-name">Brief</span>
+    </div>
+    <div class="prog-line"></div>
+    <div class="prog-step {% if script_active %}active{% endif %} {% if script_done %}done{% endif %}">
+      <span class="prog-num">02</span>
+      <span class="prog-name">Script</span>
+    </div>
+    <div class="prog-line"></div>
+    <div class="prog-step {% if audio_active %}active{% endif %} {% if audio_done %}done{% endif %}">
+      <span class="prog-num">03</span>
+      <span class="prog-name">Audio</span>
+    </div>
+  </div>
+
+  <!-- Stage panels — always rendered; JS controls locked/active state -->
+  {% set script_locked = project.status not in ['scripting','script_outline','script_streaming','script_ready','rendering','done','error'] %}
+  {% set audio_locked  = project.status not in ['rendering','done'] %}
+
+  <section class="stage-section" id="stage-brief">
+    <div class="stage-num">01</div>
+    <div class="stage-body">
+      {% include "partials/stage_brief.html" %}
+    </div>
+  </section>
+
+  <section class="stage-section {% if script_locked %}stage-locked{% endif %}" id="stage-script">
+    <div class="stage-num">02</div>
+    <div class="stage-body">
+      {% include "partials/stage_script.html" %}
+    </div>
+  </section>
+
+  <section class="stage-section {% if audio_locked %}stage-locked{% endif %}" id="stage-audio">
+    <div class="stage-num">03</div>
+    <div class="stage-body">
+      {% include "partials/stage_audio.html" %}
+    </div>
+  </section>
+
+  <!-- Cost log -->
+  {% if project.stage_logs %}
+  <section class="stage-section cost-section">
+    <div class="stage-num">$</div>
+    <div class="stage-body">
+      <h3 class="section-title">Cost breakdown</h3>
+      <table class="cost-table">
+        <thead>
+          <tr>
+            <th>Stage</th><th>Model</th><th>Prompt</th><th>Completion</th><th>Cost</th><th>Duration</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in project.stage_logs %}
+          <tr>
+            <td><code class="stage-tag">{{ log.stage }}</code></td>
+            <td class="model-cell">{{ log.model or "—" }}</td>
+            <td>{{ "{:,}".format(log.prompt_tokens) }}</td>
+            <td>{{ "{:,}".format(log.completion_tokens) }}</td>
+            <td class="cost-cell">${{ "%.4f"|format(log.cost_usd) }}</td>
+            <td class="dur-cell">{{ log.duration_ms }}ms</td>
+            <td>
+              {% if log.thinking %}
+              <button class="think-toggle" onclick="toggleThinking('think-{{ log.id }}', this)" title="View model reasoning">⟨/⟩</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% if log.thinking %}
+          <tr class="think-row" id="think-{{ log.id }}" style="display:none">
+            <td colspan="7">
+              <div class="think-block">
+                <div class="think-header">Model reasoning ({{ log.stage }} — {{ log.model }})</div>
+                <pre class="think-content">{{ log.thinking }}</pre>
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}

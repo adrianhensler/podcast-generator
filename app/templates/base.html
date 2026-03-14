@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Research Podcast Studio{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Syne:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
+</head>
+<body{% block body_attrs %}{% endblock %}>
+  <div class="app-layout">
+
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="/" class="logo">
+          <span class="logo-mark">RPS</span>
+          <span class="logo-tag">Podcast Studio</span>
+        </a>
+        <a href="/" class="new-btn" title="New project">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+
+      <div class="sidebar-label">Recent</div>
+
+      <div class="sidebar-projects"
+           hx-get="/projects?page=1"
+           hx-trigger="load, projectCreated from:body"
+           hx-swap="innerHTML">
+        <div class="sidebar-loading">Loading…</div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

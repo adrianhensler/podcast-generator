@@ -1,0 +1,62 @@
+<div class="section-header">
+  <h3 class="section-title">Script</h3>
+  <a href="/projects/{{ project.id }}/artifacts/script/download" class="btn-ghost">Download</a>
+</div>
+
+<div id="script-status" class="status-inline"></div>
+
+<div id="script-thinking" class="thinking-stream" style="display:none">
+  <div class="thinking-stream-header">Model reasoning</div>
+  <div id="script-thinking-content" class="thinking-stream-content"></div>
+</div>
+
+<textarea
+  id="script-textarea"
+  class="artifact-editor script-editor"
+  hx-put="/projects/{{ project.id }}/artifacts/script"
+  hx-trigger="blur"
+  hx-vals='js:{"content": document.getElementById("script-textarea").value}'
+  hx-swap="none"
+  rows="22"
+  placeholder="Script will appear here…"
+></textarea>
+<p class="editor-hint">Edit Host A: / Host B: lines directly. Auto-saved on focus loss.</p>
+
+<div class="revision-row" id="script-revision" style="display:none">
+  <textarea id="script-revision-input" class="revision-input" rows="2" placeholder="Any revisions? Describe in plain English…"></textarea>
+  <button class="btn-ghost" onclick="submitRevision('script')">Revise</button>
+</div>
+
+<div id="script-action-row" class="stage-action" style="display:none">
+  <form hx-post="/projects/{{ project.id }}/render"
+        hx-swap="none"
+        hx-include="#voice-form">
+
+    <div id="voice-form" class="voice-form">
+      {% set voices = ["Wise_Woman","Friendly_Person","Inspirational_girl","Deep_Voice_Man","Calm_Woman","Casual_Guy","Lively_Girl","Patient_Man","Young_Knight","Determined_Man","Lovely_Girl","Decent_Boy","Imposing_Manner","Elegant_Man","Abbess","Sparkling_Girl","Interesting_Man"] %}
+      <div class="voice-field">
+        <label class="voice-label">Host A</label>
+        <select name="host_a_voice" class="voice-select">
+          {% for v in voices %}
+          <option value="{{ v }}" {% if v == project.host_a_voice %}selected{% endif %}>{{ v.replace("_", " ") }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if project.num_speakers == 2 %}
+      <div class="voice-field">
+        <label class="voice-label">Host B</label>
+        <select name="host_b_voice" class="voice-select">
+          {% for v in voices %}
+          <option value="{{ v }}" {% if v == project.host_b_voice %}selected{% endif %}>{{ v.replace("_", " ") }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn-stage">
+      Render Audio
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 7.5h10M8.5 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </form>
+</div>

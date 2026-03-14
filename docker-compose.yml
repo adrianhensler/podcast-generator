@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./output:/app/output
+      - ./podcast_studio.db:/app/podcast_studio.db
+    env_file:
+      - .env
+    restart: unless-stopped

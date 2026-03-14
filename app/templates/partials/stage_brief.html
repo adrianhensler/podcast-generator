@@ -1,0 +1,37 @@
+<div class="section-header">
+  <h3 class="section-title">Research Brief</h3>
+  <a href="/projects/{{ project.id }}/artifacts/research_brief/download" class="btn-ghost">Download</a>
+</div>
+
+<div id="brief-status" class="status-inline"></div>
+
+<div id="brief-thinking" class="thinking-stream" style="display:none">
+  <div class="thinking-stream-header">Model reasoning</div>
+  <div id="brief-thinking-content" class="thinking-stream-content"></div>
+</div>
+
+<textarea
+  id="brief-textarea"
+  class="artifact-editor"
+  hx-put="/projects/{{ project.id }}/artifacts/research_brief"
+  hx-trigger="blur"
+  hx-vals='js:{"content": document.getElementById("brief-textarea").value}'
+  hx-swap="none"
+  rows="14"
+  placeholder="Brief will appear here…"
+></textarea>
+<p class="editor-hint">Auto-saved on focus loss.</p>
+
+<div class="revision-row" id="brief-revision" style="display:none">
+  <textarea id="brief-revision-input" class="revision-input" rows="2" placeholder="Any revisions? Describe in plain English…"></textarea>
+  <button class="btn-ghost" onclick="submitRevision('brief')">Revise</button>
+</div>
+
+<div id="brief-action-row" class="stage-action" style="display:none">
+  <form hx-post="/projects/{{ project.id }}/generate-script" hx-swap="none">
+    <button type="submit" class="btn-stage">
+      Generate Script
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 7.5h10M8.5 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </form>
+</div>

@@ -1,0 +1,27 @@
+{% if not projects %}
+<div class="sidebar-empty">No projects yet.</div>
+{% else %}
+<ul class="project-list">
+  {% for p in projects %}
+  <li class="project-item">
+    <a href="/projects/{{ p.id }}" class="project-link">
+      <span class="project-item-title">{{ p.title or p.url }}</span>
+      <span class="project-status-dot status-{{ p.status }}"></span>
+    </a>
+    {% if p.status == "done" %}
+    <audio controls class="mini-player" src="/projects/{{ p.id }}/audio" preload="none"></audio>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% if page > 1 or has_next %}
+<div class="sidebar-pagination">
+  {% if page > 1 %}
+  <button class="pg-btn" hx-get="/projects?page={{ page - 1 }}" hx-target=".sidebar-projects" hx-swap="innerHTML">← Prev</button>
+  {% endif %}
+  {% if has_next %}
+  <button class="pg-btn" hx-get="/projects?page={{ page + 1 }}" hx-target=".sidebar-projects" hx-swap="innerHTML">Next →</button>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
