@@ -2,7 +2,7 @@
 
 Turn any URL into a dual-host research podcast with editable brief and script.
 
-![Research Podcast Studio](https://raw.githubusercontent.com/adrianhensler/podcast-generator/main/docs/screenshot.png)
+<img src="https://raw.githubusercontent.com/adrianhensler/podcast-generator/main/docs/screenshot.png" width="800" />
 
 ### Example output
 
