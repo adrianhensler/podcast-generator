@@ -13,7 +13,16 @@
   <div><strong>Step 1 of 2 — Fetching source</strong><p>Extracting article content from URL…</p></div>
 </div>
 
-{% elif project.status == "briefing" %}
+{% elif project.status == "brief_pending" %}
+<div class="status-bar status-live"
+     hx-get="/projects/{{ project.id }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  <span class="status-dot-anim live"></span>
+  <div><strong>Step 2 of 2 — Preparing research brief</strong><p>Source is ready. Waiting to start brief generation…</p></div>
+</div>
+
+{% elif project.status == "brief_streaming" %}
 <div class="status-bar status-live"
      hx-get="/projects/{{ project.id }}/status"
      hx-trigger="every 2s"
@@ -28,7 +37,25 @@
      hx-trigger="every 2s"
      hx-swap="outerHTML">
   <span class="status-dot-anim live"></span>
-  <div><strong>Generating script</strong><p>Stage A: outline → Stage B: expanding to {{ project.num_speakers }}-host dialogue ({{ project.length }})…</p></div>
+  <div><strong>Generating script outline</strong><p>Building episode structure before full dialogue expansion…</p></div>
+</div>
+
+{% elif project.status == "script_outline" %}
+<div class="status-bar status-live"
+     hx-get="/projects/{{ project.id }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  <span class="status-dot-anim live"></span>
+  <div><strong>Script outline ready</strong><p>Preparing full {{ project.num_speakers }}-host dialogue draft…</p></div>
+</div>
+
+{% elif project.status == "script_streaming" %}
+<div class="status-bar status-live"
+     hx-get="/projects/{{ project.id }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  <span class="status-dot-anim live"></span>
+  <div><strong>Generating script</strong><p>Expanding outline to {{ project.num_speakers }}-host dialogue ({{ project.length }})…</p></div>
 </div>
 
 {% elif project.status == "rendering" %}
