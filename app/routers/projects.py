@@ -229,26 +229,17 @@ async def run_tts_render(project_id: str):
         if not project:
             return
 
-        from app.models import Artifact
-        from app.services.storage import read_artifact
         from app.services.tts_renderer import render
         from app.services.script_generator import parse_script_lines, ScriptParseError
         from pathlib import Path
         from app.config import settings as app_settings
 
-        script_artifact = db.query(Artifact).filter_by(
-            project_id=project_id, artifact_type="script"
-        ).first()
+        script_path = Path(app_settings.output_dir) / project_id / "script.md"
+        if not script_path.exists():
+            _set_error(db, project, "No script found. Please generate a script first.")
+            return
 
-        if not script_artifact:
-            script_path = Path(app_settings.output_dir) / project_id / "script.md"
-            if script_path.exists():
-                script_text = script_path.read_text()
-            else:
-                _set_error(db, project, "No script found. Please generate a script first.")
-                return
-        else:
-            script_text = await read_artifact(script_artifact.file_path)
+        script_text = script_path.read_text(encoding="utf-8")
 
         try:
             lines = parse_script_lines(script_text)

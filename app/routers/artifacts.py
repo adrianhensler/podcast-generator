@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import Project, Artifact
-from app.services.storage import read_artifact, write_artifact
+from app.models import Project
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -17,7 +16,7 @@ VALID_TYPES = {"normalized_sources", "research_brief", "script"}
 
 
 def _get_artifact_path(project_id: str, artifact_type: str) -> Path:
-    """Resolve artifact path, checking both DB artifacts and default file locations."""
+    """Resolve artifact path from the filesystem artifact naming convention."""
     filename_map = {
         "normalized_sources": "normalized_sources.md",
         "research_brief": "research_brief.md",
