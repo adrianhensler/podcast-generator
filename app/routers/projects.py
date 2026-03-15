@@ -84,18 +84,6 @@ async def project_list(request: Request, page: int = 1, db: Session = Depends(ge
     )
 
 
-@router.get("/projects/{project_id}/status", response_class=HTMLResponse)
-async def project_status(project_id: str, request: Request, db: Session = Depends(get_db)):
-    from app.main import templates
-    project = db.get(Project, project_id)
-    if not project:
-        return HTMLResponse("Not found", status_code=404)
-    return templates.TemplateResponse(
-        request, "partials/job_status.html",
-        {"project": project},
-    )
-
-
 @router.get("/projects/{project_id}/status/json")
 async def project_status_json(project_id: str, db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
