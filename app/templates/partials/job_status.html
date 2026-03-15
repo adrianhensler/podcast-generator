@@ -13,7 +13,16 @@
   <div><strong>Step 1 of 2 — Fetching source</strong><p>Extracting article content from URL…</p></div>
 </div>
 
-{% elif project.status == "briefing" %}
+{% elif project.status == "brief_pending" %}
+<div class="status-bar status-live"
+     hx-get="/projects/{{ project.id }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  <span class="status-dot-anim live"></span>
+  <div><strong>Step 2 of 2 — Preparing research brief</strong><p>Source content is ready. Starting the brief generation stream…</p></div>
+</div>
+
+{% elif project.status == "brief_streaming" %}
 <div class="status-bar status-live"
      hx-get="/projects/{{ project.id }}/status"
      hx-trigger="every 2s"
@@ -28,7 +37,25 @@
      hx-trigger="every 2s"
      hx-swap="outerHTML">
   <span class="status-dot-anim live"></span>
-  <div><strong>Generating script</strong><p>Stage A: outline → Stage B: expanding to {{ project.num_speakers }}-host dialogue ({{ project.length }})…</p></div>
+  <div><strong>Generating script outline</strong><p>Creating structure for a {{ project.num_speakers }}-host dialogue ({{ project.length }})…</p></div>
+</div>
+
+{% elif project.status == "script_outline" %}
+<div class="status-bar status-live"
+     hx-get="/projects/{{ project.id }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  <span class="status-dot-anim live"></span>
+  <div><strong>Script outline ready</strong><p>Preparing full script expansion from approved outline…</p></div>
+</div>
+
+{% elif project.status == "script_streaming" %}
+<div class="status-bar status-live"
+     hx-get="/projects/{{ project.id }}/status"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+  <span class="status-dot-anim live"></span>
+  <div><strong>Expanding script</strong><p>Converting outline into a full {{ project.num_speakers }}-host dialogue ({{ project.length }})…</p></div>
 </div>
 
 {% elif project.status == "rendering" %}
