@@ -76,6 +76,7 @@ async def _run_stream(llm_gen, project_id: str, filename: str, db, project, term
 
                 if segment == "</think>":
                     in_thinking = False
+                    yield _sse({"type": "content_start"})
                     continue
 
                 if in_thinking:

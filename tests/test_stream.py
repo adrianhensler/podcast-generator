@@ -45,10 +45,11 @@ async def test_run_stream_splits_think_and_visible_tokens_in_one_chunk():
             payload = json.loads(event.removeprefix("data: ").strip())
             events.append(payload)
 
-    assert events[:4] == [
+    assert events[:5] == [
         {"type": "thinking"},
         {"type": "thinking_token", "text": "abc"},
-        {"type": "content_start"},
+        {"type": "content_start"},   # emitted on </think>
+        {"type": "content_start"},   # emitted on first visible segment
         {"type": "token", "text": "visible"},
     ]
     assert events[-2] == {"type": "final_content", "text": "visible"}
@@ -84,12 +85,13 @@ async def test_run_stream_tracks_thinking_across_chunks_and_emits_visible_tokens
             payload = json.loads(event.removeprefix("data: ").strip())
             events.append(payload)
 
-    assert events[:6] == [
+    assert events[:7] == [
         {"type": "content_start"},
         {"type": "token", "text": "pre"},
         {"type": "thinking"},
         {"type": "thinking_token", "text": "x"},
         {"type": "thinking_token", "text": "y"},
+        {"type": "content_start"},   # emitted on </think>
         {"type": "token", "text": "post"},
     ]
     assert events[-2] == {"type": "final_content", "text": "prepost"}
