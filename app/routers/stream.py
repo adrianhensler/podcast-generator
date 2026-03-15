@@ -63,23 +63,29 @@ async def _run_stream(llm_gen, project_id: str, filename: str, db, project, term
         elif isinstance(item, str):
             accumulated.append(item)
 
-            # Track <think> block boundaries and suppress thinking tokens
-            if "<think>" in item:
-                in_thinking = True
-                yield _sse({"type": "thinking"})
-                continue
-            if "</think>" in item:
-                in_thinking = False
-                yield _sse({"type": "content_start"})
-                continue
-            if in_thinking:
-                yield _sse({"type": "thinking_token", "text": item})
-                continue
+            # Parse mixed chunks by think-tag boundaries so one chunk can emit both modes.
+            segments = re.split(r"(<think>|</think>)", item)
+            for segment in segments:
+                if not segment:
+                    continue
 
-            if not seen_content and item.strip():
-                seen_content = True
-                yield _sse({"type": "content_start"})
-            yield _sse({"type": "token", "text": item})
+                if segment == "<think>":
+                    in_thinking = True
+                    yield _sse({"type": "thinking"})
+                    continue
+
+                if segment == "</think>":
+                    in_thinking = False
+                    continue
+
+                if in_thinking:
+                    yield _sse({"type": "thinking_token", "text": segment})
+                    continue
+
+                if not seen_content and segment.strip():
+                    seen_content = True
+                    yield _sse({"type": "content_start"})
+                yield _sse({"type": "token", "text": segment})
 
     raw = "".join(accumulated)
     content, thinking = _strip_thinking(raw)
