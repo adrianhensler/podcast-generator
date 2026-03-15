@@ -54,6 +54,7 @@ Open http://localhost:8000
 
 ## Features
 
+- Artifacts are filesystem-backed (`output/<project_id>/...`); DB metadata is not used for artifact reads/downloads
 - URL → Research Brief → Script → Audio end-to-end
 - SSE streaming for brief and script generation
 - Plain-English revision prompts on brief and script
