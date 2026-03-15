@@ -71,11 +71,13 @@
             <option value="{{ v }}" {% if v == "Wise_Woman" %}selected{% endif %}>A: {{ v.replace("_", " ") }}</option>
             {% endfor %}
           </select>
+          <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview Host A voice">▶</button>
           <select name="host_b_voice" class="voice-select">
             {% for v in voices %}
             <option value="{{ v }}" {% if v == "Deep_Voice_Man" %}selected{% endif %}>B: {{ v.replace("_", " ") }}</option>
             {% endfor %}
           </select>
+          <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview Host B voice">▶</button>
         </div>
       </div>
 

@@ -754,6 +754,20 @@ a:hover { color: var(--text); }
   white-space: nowrap;
 }
 
+.btn-voice-preview {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  padding: 4px 6px;
+  transition: color 0.1s, border-color 0.1s;
+}
+.btn-voice-preview:hover { color: var(--text); border-color: var(--amber); }
+.btn-voice-preview.playing { color: var(--amber); border-color: var(--amber); }
+
 /* Audio player */
 .audio-wrap {
   padding: 6px 0;

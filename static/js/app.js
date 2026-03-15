@@ -395,6 +395,48 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 });
 
+// ── Voice preview ─────────────────────────────────────────────────────────
+let _voiceAudio = null;
+let _voicePreviewBtn = null;
+
+function previewVoice(btn) {
+  // Stop any currently playing preview
+  if (_voiceAudio) {
+    _voiceAudio.pause();
+    _voiceAudio = null;
+    if (_voicePreviewBtn) {
+      _voicePreviewBtn.textContent = '▶';
+      _voicePreviewBtn.classList.remove('playing');
+    }
+    // Clicking the same button again just stops
+    if (_voicePreviewBtn === btn) {
+      _voicePreviewBtn = null;
+      return;
+    }
+  }
+
+  const select = btn.previousElementSibling;
+  const voice = select.value;
+  _voiceAudio = new Audio(`/output/voice_samples/${voice}.mp3`);
+  _voicePreviewBtn = btn;
+  btn.textContent = '■';
+  btn.classList.add('playing');
+
+  _voiceAudio.addEventListener('ended', () => {
+    btn.textContent = '▶';
+    btn.classList.remove('playing');
+    _voiceAudio = null;
+    _voicePreviewBtn = null;
+  });
+
+  _voiceAudio.play().catch(() => {
+    btn.textContent = '▶';
+    btn.classList.remove('playing');
+    _voiceAudio = null;
+    _voicePreviewBtn = null;
+  });
+}
+
 // ── htmx JSON body extension for PUT requests ─────────────────────────────
 htmx.defineExtension && htmx.defineExtension('json-enc', {
   onEvent: function(name, evt) {

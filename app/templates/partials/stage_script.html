@@ -41,6 +41,7 @@
           <option value="{{ v }}" {% if v == project.host_a_voice %}selected{% endif %}>{{ v.replace("_", " ") }}</option>
           {% endfor %}
         </select>
+        <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview voice">▶</button>
       </div>
       {% if project.num_speakers == 2 %}
       <div class="voice-field">
@@ -50,6 +51,7 @@
           <option value="{{ v }}" {% if v == project.host_b_voice %}selected{% endif %}>{{ v.replace("_", " ") }}</option>
           {% endfor %}
         </select>
+        <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview voice">▶</button>
       </div>
       {% endif %}
     </div>
