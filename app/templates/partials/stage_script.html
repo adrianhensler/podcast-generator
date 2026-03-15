@@ -57,10 +57,11 @@
       {% endif %}
       <div class="voice-field">
         <label class="voice-label">Quality</label>
-        <select name="tts_model" class="voice-select">
+        <select name="tts_model" class="voice-select" onchange="updateTtsCostEstimate()">
           <option value="turbo">Standard — $0.030/1k chars</option>
           <option value="hd">HD — $0.050/1k chars</option>
         </select>
+        <span id="tts-cost-estimate" class="tts-cost-estimate"></span>
       </div>
     </div>
 

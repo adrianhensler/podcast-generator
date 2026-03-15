@@ -62,6 +62,7 @@ function showRevisionRow(type) {
 function showActionRow(type) {
   const el = document.getElementById(type + '-action-row');
   if (el) el.style.display = 'block';
+  if (type === 'script') updateTtsCostEstimate();
 }
 
 // ── Poll until status ──────────────────────────────────────────────────────
@@ -394,6 +395,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
 });
+
+// ── TTS cost estimate ─────────────────────────────────────────────────────
+const TTS_RATES = { turbo: 30, hd: 50 }; // USD per million chars
+
+function updateTtsCostEstimate() {
+  const el = document.getElementById('tts-cost-estimate');
+  const textarea = document.getElementById('script-textarea');
+  const select = document.querySelector('select[name="tts_model"]');
+  if (!el || !textarea || !select) return;
+  const chars = textarea.value.length;
+  if (!chars) { el.textContent = ''; return; }
+  const rate = TTS_RATES[select.value] || TTS_RATES.turbo;
+  const cost = (chars * rate / 1_000_000).toFixed(3);
+  el.textContent = `~$${cost}`;
+}
 
 // ── Voice preview ─────────────────────────────────────────────────────────
 let _voiceAudio = null;
