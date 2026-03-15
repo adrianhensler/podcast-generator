@@ -417,24 +417,22 @@ function previewVoice(btn) {
 
   const select = btn.previousElementSibling;
   const voice = select.value;
-  _voiceAudio = new Audio(`/output/voice_samples/${voice}.mp3`);
+  const audio = new Audio(`/output/voice_samples/${voice}.mp3`);
+  _voiceAudio = audio;
   _voicePreviewBtn = btn;
   btn.textContent = '■';
   btn.classList.add('playing');
 
-  _voiceAudio.addEventListener('ended', () => {
+  const cleanup = () => {
+    if (_voiceAudio !== audio) return; // a newer preview has already taken over
     btn.textContent = '▶';
     btn.classList.remove('playing');
     _voiceAudio = null;
     _voicePreviewBtn = null;
-  });
+  };
 
-  _voiceAudio.play().catch(() => {
-    btn.textContent = '▶';
-    btn.classList.remove('playing');
-    _voiceAudio = null;
-    _voicePreviewBtn = null;
-  });
+  audio.addEventListener('ended', cleanup);
+  audio.play().catch(cleanup);
 }
 
 // ── htmx JSON body extension for PUT requests ─────────────────────────────
