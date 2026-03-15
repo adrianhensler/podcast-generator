@@ -13,7 +13,7 @@ from app.services.storage import project_dir, segments_dir, write_bytes
 
 logger = logging.getLogger(__name__)
 
-REPLICATE_API_URL = "https://api.replicate.com/v1/models/minimax/speech-02-turbo/predictions"
+REPLICATE_API_URL_TURBO = "https://api.replicate.com/v1/models/minimax/speech-02-turbo/predictions"
 MAX_POLL_TIMEOUT = 120
 SILENCE_DURATION_MS = 300
 
@@ -58,33 +58,36 @@ async def render(
     script_lines: list[ScriptLine],
     host_a_voice: str = "Wise_Woman",
     host_b_voice: str = "Deep_Voice_Man",
-) -> str:
-    """Render all script lines to audio segments, stitch, return path to audio.mp3."""
+    api_url: str = REPLICATE_API_URL_TURBO,
+) -> tuple[str, int]:
+    """Render all script lines to audio segments, stitch, return (path, total_chars)."""
     seg_dir = segments_dir(project_id)
     silence_path = get_silence_path()
 
     semaphore = asyncio.Semaphore(settings.replicate_concurrency)
 
-    async def render_line(idx: int, line: ScriptLine) -> Path:
+    async def render_line(idx: int, line: ScriptLine) -> tuple[Path, int]:
         voice = host_a_voice if line.speaker == "Host A" else host_b_voice
         normalized_text = normalize_for_speech(line.text)
         seg_path = seg_dir / f"seg_{idx:04d}.mp3"
         async with semaphore:
-            await _render_segment(normalized_text, voice, seg_path)
-        return seg_path
+            await _render_segment(normalized_text, voice, seg_path, api_url)
+        return seg_path, len(normalized_text)
 
     tasks = [render_line(i, line) for i, line in enumerate(script_lines)]
-    segment_paths = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks)
+    segment_paths = [r[0] for r in results]
+    total_chars = sum(r[1] for r in results)
 
     # Build concat list: seg, silence, seg, silence, ...
     audio_mp3 = project_dir(project_id) / "audio.mp3"
     _stitch_segments(list(segment_paths), silence_path, audio_mp3)
 
     logger.info("Rendered %d segments → %s", len(segment_paths), audio_mp3)
-    return str(audio_mp3)
+    return str(audio_mp3), total_chars
 
 
-async def _render_segment(text: str, voice_id: str, output_path: Path) -> None:
+async def _render_segment(text: str, voice_id: str, output_path: Path, api_url: str = REPLICATE_API_URL_TURBO) -> None:
     headers = {
         "Authorization": f"Bearer {settings.replicate_api_token}",
         "Content-Type": "application/json",
@@ -104,7 +107,7 @@ async def _render_segment(text: str, voice_id: str, output_path: Path) -> None:
     }
 
     async with httpx.AsyncClient(timeout=90.0) as client:
-        resp = await client.post(REPLICATE_API_URL, headers=headers, json=payload)
+        resp = await client.post(api_url, headers=headers, json=payload)
 
     if resp.status_code == 201:
         # Sync result with Prefer: wait

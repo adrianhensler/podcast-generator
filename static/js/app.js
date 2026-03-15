@@ -62,6 +62,7 @@ function showRevisionRow(type) {
 function showActionRow(type) {
   const el = document.getElementById(type + '-action-row');
   if (el) el.style.display = 'block';
+  if (type === 'script') updateTtsCostEstimate();
 }
 
 // ── Poll until status ──────────────────────────────────────────────────────
@@ -394,6 +395,61 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   }
 });
+
+// ── TTS cost estimate ─────────────────────────────────────────────────────
+const TTS_RATES = { turbo: 30, hd: 50 }; // USD per million chars
+
+function updateTtsCostEstimate() {
+  const el = document.getElementById('tts-cost-estimate');
+  const textarea = document.getElementById('script-textarea');
+  const select = document.querySelector('select[name="tts_model"]');
+  if (!el || !textarea || !select) return;
+  const chars = textarea.value.length;
+  if (!chars) { el.textContent = ''; return; }
+  const rate = TTS_RATES[select.value] || TTS_RATES.turbo;
+  const cost = (chars * rate / 1_000_000).toFixed(3);
+  el.textContent = `~$${cost}`;
+}
+
+// ── Voice preview ─────────────────────────────────────────────────────────
+let _voiceAudio = null;
+let _voicePreviewBtn = null;
+
+function previewVoice(btn) {
+  // Stop any currently playing preview
+  if (_voiceAudio) {
+    _voiceAudio.pause();
+    _voiceAudio = null;
+    if (_voicePreviewBtn) {
+      _voicePreviewBtn.textContent = '▶';
+      _voicePreviewBtn.classList.remove('playing');
+    }
+    // Clicking the same button again just stops
+    if (_voicePreviewBtn === btn) {
+      _voicePreviewBtn = null;
+      return;
+    }
+  }
+
+  const select = btn.previousElementSibling;
+  const voice = select.value;
+  const audio = new Audio(`/output/voice_samples/${voice}.mp3`);
+  _voiceAudio = audio;
+  _voicePreviewBtn = btn;
+  btn.textContent = '■';
+  btn.classList.add('playing');
+
+  const cleanup = () => {
+    if (_voiceAudio !== audio) return; // a newer preview has already taken over
+    btn.textContent = '▶';
+    btn.classList.remove('playing');
+    _voiceAudio = null;
+    _voicePreviewBtn = null;
+  };
+
+  audio.addEventListener('ended', cleanup);
+  audio.play().catch(cleanup);
+}
 
 // ── htmx JSON body extension for PUT requests ─────────────────────────────
 htmx.defineExtension && htmx.defineExtension('json-enc', {

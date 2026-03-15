@@ -21,6 +21,20 @@ class Settings(BaseSettings):
         "z-ai/glm-4.7": {"input": 0.38, "output": 1.98},
     })
 
+    # TTS model options (cost_per_m_chars = USD per million characters)
+    tts_models: dict = Field(default={
+        "turbo": {
+            "url": "https://api.replicate.com/v1/models/minimax/speech-02-turbo/predictions",
+            "cost_per_m_chars": 30.0,
+            "label": "Standard",
+        },
+        "hd": {
+            "url": "https://api.replicate.com/v1/models/minimax/speech-02-hd/predictions",
+            "cost_per_m_chars": 50.0,
+            "label": "HD",
+        },
+    })
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
