@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings  # loads .env
-from app.services.tts_renderer import _render_segment
+from app.services.tts_renderer import _render_segment, REPLICATE_API_URL_TURBO
 
 VOICES = [
     "Wise_Woman",
@@ -33,20 +33,26 @@ VOICES = [
     "Imposing_Manner",
     "Elegant_Man",
     "Abbess",
-    "Sparkling_Girl",
-    "Interesting_Man",
+    "English_WhimsicalGirl",
+    "English_Jovialman",
 ]
+
+VOICE_LABELS = {
+    "Young_Knight": "Young Woman",
+    "English_WhimsicalGirl": "Whimsical Girl",
+    "English_Jovialman": "Jovial Man",
+}
 
 OUTPUT_DIR = Path(settings.output_dir) / "voice_samples"
 
 
 async def generate_sample(voice_id: str, semaphore: asyncio.Semaphore) -> tuple[str, bool, str]:
-    display_name = voice_id.replace("_", " ")
+    display_name = VOICE_LABELS.get(voice_id, voice_id.replace("_", " "))
     text = f"This is a sample of voice {display_name}."
     out_path = OUTPUT_DIR / f"{voice_id}.mp3"
     async with semaphore:
         try:
-            await _render_segment(text, voice_id, out_path)
+            await _render_segment(text, voice_id, out_path, REPLICATE_API_URL_TURBO)
             size_kb = out_path.stat().st_size // 1024
             return voice_id, True, f"{size_kb} KB"
         except Exception as exc:

@@ -139,13 +139,14 @@ async def render_audio(
     form = await request.form()
     host_a_voice = form.get("host_a_voice", project.host_a_voice)
     host_b_voice = form.get("host_b_voice", project.host_b_voice)
+    tts_model = form.get("tts_model", "turbo")
     project.host_a_voice = host_a_voice
     project.host_b_voice = host_b_voice
     project.status = "rendering"
     project.error_message = None
     db.commit()
 
-    background_tasks.add_task(run_tts_render, project_id)
+    background_tasks.add_task(run_tts_render, project_id, tts_model)
     resp = HTMLResponse("")
     resp.headers["HX-Refresh"] = "true"
     return resp
@@ -222,7 +223,7 @@ async def run_script_outline(project_id: str):
         db.close()
 
 
-async def run_tts_render(project_id: str):
+async def run_tts_render(project_id: str, tts_model: str = "turbo"):
     db = SessionLocal()
     try:
         project = db.get(Project, project_id)
@@ -231,7 +232,9 @@ async def run_tts_render(project_id: str):
 
         from app.services.tts_renderer import render
         from app.services.script_generator import parse_script_lines, ScriptParseError
+        from app.models import StageLog
         from pathlib import Path
+        import time as _time
         from app.config import settings as app_settings
 
         script_path = Path(app_settings.output_dir) / project_id / "script.md"
@@ -247,17 +250,35 @@ async def run_tts_render(project_id: str):
             _set_error(db, project, str(e))
             return
 
+        model_cfg = app_settings.tts_models.get(tts_model, app_settings.tts_models["turbo"])
+        api_url = model_cfg["url"]
+        cost_per_m = model_cfg["cost_per_m_chars"]
+
+        t0 = _time.monotonic()
         try:
-            audio_path = await render(
-                project_id, lines, project.host_a_voice, project.host_b_voice
+            audio_path, total_chars = await render(
+                project_id, lines, project.host_a_voice, project.host_b_voice, api_url
             )
         except Exception as e:
             _set_error(db, project, f"Audio render error: {e}")
             return
+        duration_ms = int((_time.monotonic() - t0) * 1000)
 
+        cost_usd = total_chars * cost_per_m / 1_000_000
+        tts_log = StageLog(
+            project_id=project_id,
+            stage="tts",
+            model=f"speech-02-{tts_model}",
+            prompt_tokens=total_chars,
+            completion_tokens=0,
+            cost_usd=cost_usd,
+            duration_ms=duration_ms,
+        )
+        db.add(tts_log)
+        project.estimated_cost_usd += cost_usd
         project.status = "done"
         db.commit()
-        logger.info("Project %s: done → %s", project_id, audio_path)
+        logger.info("Project %s: done → %s (%d chars, $%.4f)", project_id, audio_path, total_chars, cost_usd)
 
     finally:
         db.close()

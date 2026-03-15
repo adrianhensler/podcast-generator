@@ -33,12 +33,13 @@
         hx-include="#voice-form">
 
     <div id="voice-form" class="voice-form">
-      {% set voices = ["Wise_Woman","Friendly_Person","Inspirational_girl","Deep_Voice_Man","Calm_Woman","Casual_Guy","Lively_Girl","Patient_Man","Young_Knight","Determined_Man","Lovely_Girl","Decent_Boy","Imposing_Manner","Elegant_Man","Abbess","Sparkling_Girl","Interesting_Man"] %}
+      {% set voices = ["Wise_Woman","Friendly_Person","Inspirational_girl","Deep_Voice_Man","Calm_Woman","Casual_Guy","Lively_Girl","Patient_Man","Young_Knight","Determined_Man","Lovely_Girl","Decent_Boy","Imposing_Manner","Elegant_Man","Abbess","English_WhimsicalGirl","English_Jovialman"] %}
+      {% set voice_labels = {"Young_Knight": "Young Woman", "English_WhimsicalGirl": "Whimsical Girl", "English_Jovialman": "Jovial Man"} %}
       <div class="voice-field">
         <label class="voice-label">Host A</label>
         <select name="host_a_voice" class="voice-select">
           {% for v in voices %}
-          <option value="{{ v }}" {% if v == project.host_a_voice %}selected{% endif %}>{{ v.replace("_", " ") }}</option>
+          <option value="{{ v }}" {% if v == project.host_a_voice %}selected{% endif %}>{{ voice_labels.get(v, v.replace("_", " ")) }}</option>
           {% endfor %}
         </select>
         <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview voice">▶</button>
@@ -48,12 +49,19 @@
         <label class="voice-label">Host B</label>
         <select name="host_b_voice" class="voice-select">
           {% for v in voices %}
-          <option value="{{ v }}" {% if v == project.host_b_voice %}selected{% endif %}>{{ v.replace("_", " ") }}</option>
+          <option value="{{ v }}" {% if v == project.host_b_voice %}selected{% endif %}>{{ voice_labels.get(v, v.replace("_", " ")) }}</option>
           {% endfor %}
         </select>
         <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview voice">▶</button>
       </div>
       {% endif %}
+      <div class="voice-field">
+        <label class="voice-label">Quality</label>
+        <select name="tts_model" class="voice-select">
+          <option value="turbo">Standard — $0.030/1k chars</option>
+          <option value="hd">HD — $0.050/1k chars</option>
+        </select>
+      </div>
     </div>
 
     <button type="submit" class="btn-stage">

@@ -65,16 +65,17 @@
       <div class="opt-group">
         <span class="opt-label">Voices</span>
         <div class="voice-selects">
-          {% set voices = ["Wise_Woman","Friendly_Person","Inspirational_girl","Deep_Voice_Man","Calm_Woman","Casual_Guy","Lively_Girl","Patient_Man","Young_Knight","Determined_Man","Lovely_Girl","Decent_Boy","Imposing_Manner","Elegant_Man","Abbess","Sparkling_Girl","Interesting_Man"] %}
+          {% set voices = ["Wise_Woman","Friendly_Person","Inspirational_girl","Deep_Voice_Man","Calm_Woman","Casual_Guy","Lively_Girl","Patient_Man","Young_Knight","Determined_Man","Lovely_Girl","Decent_Boy","Imposing_Manner","Elegant_Man","Abbess","English_WhimsicalGirl","English_Jovialman"] %}
+          {% set voice_labels = {"Young_Knight": "Young Woman", "English_WhimsicalGirl": "Whimsical Girl", "English_Jovialman": "Jovial Man"} %}
           <select name="host_a_voice" class="voice-select">
             {% for v in voices %}
-            <option value="{{ v }}" {% if v == "Wise_Woman" %}selected{% endif %}>A: {{ v.replace("_", " ") }}</option>
+            <option value="{{ v }}" {% if v == "Wise_Woman" %}selected{% endif %}>A: {{ voice_labels.get(v, v.replace("_", " ")) }}</option>
             {% endfor %}
           </select>
           <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview Host A voice">▶</button>
           <select name="host_b_voice" class="voice-select">
             {% for v in voices %}
-            <option value="{{ v }}" {% if v == "Deep_Voice_Man" %}selected{% endif %}>B: {{ v.replace("_", " ") }}</option>
+            <option value="{{ v }}" {% if v == "Deep_Voice_Man" %}selected{% endif %}>B: {{ voice_labels.get(v, v.replace("_", " ")) }}</option>
             {% endfor %}
           </select>
           <button type="button" class="btn-voice-preview" onclick="previewVoice(this)" title="Preview Host B voice">▶</button>
