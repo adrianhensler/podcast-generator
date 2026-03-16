@@ -233,8 +233,12 @@ async def run_ingest_from_content(project_id: str, content: str):
             return
         project.status = "ingesting"
         db.commit()
-        from app.services.storage import write_artifact
-        await write_artifact(project_id, "normalized_sources.md", content)
+        try:
+            from app.services.storage import write_artifact
+            await write_artifact(project_id, "normalized_sources.md", content)
+        except Exception as e:
+            _set_error(db, project, f"Failed to write upload content: {e}")
+            return
         project.status = "brief_pending"
         db.commit()
         logger.info("Project %s: brief_pending (from upload)", project_id)
