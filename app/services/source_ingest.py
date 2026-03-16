@@ -66,6 +66,35 @@ def _trafilatura_extract(url: str) -> str | None:
         return None
 
 
+def _pdf_bytes_extract(data: bytes) -> str | None:
+    try:
+        import pypdf, io
+        reader = pypdf.PdfReader(io.BytesIO(data))
+        pages = [p.extract_text() or "" for p in reader.pages]
+        return "\n\n".join(p for p in pages if p.strip()) or None
+    except Exception as e:
+        logger.warning("PDF extraction failed: %s", e)
+        return None
+
+
+def extract_upload(filename: str, data: bytes) -> str:
+    """Extract text from an uploaded file (PDF, TXT, MD). Raises IngestionError if too short."""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext == "pdf":
+        content = _pdf_bytes_extract(data)
+    elif ext in ("txt", "md"):
+        content = data.decode("utf-8", errors="replace")
+    else:
+        raise IngestionError(f"Unsupported file type: .{ext}. Use PDF, TXT, or MD.")
+    if not content or len(content) < 200:
+        raise IngestionError(
+            f"Could not extract enough text from {filename} "
+            f"({len(content or '')} chars; minimum 200). "
+            "If this is a scanned PDF, it may not contain selectable text."
+        )
+    return content
+
+
 async def _httpx_extract(url: str) -> str | None:
     """Fetch with browser-like headers, then extract with trafilatura."""
     try:
@@ -80,6 +109,11 @@ async def _httpx_extract(url: str) -> str | None:
         if resp.status_code != 200:
             logger.warning("httpx fallback got %s for %s", resp.status_code, url)
             return None
+
+        # Check if response is a PDF
+        content_type = resp.headers.get("content-type", "")
+        if "application/pdf" in content_type or url.lower().split("?")[0].endswith(".pdf"):
+            return _pdf_bytes_extract(resp.content)
 
         # Pass raw bytes + url hint so trafilatura handles encoding correctly
         content = trafilatura.extract(

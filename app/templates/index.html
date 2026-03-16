@@ -9,12 +9,20 @@
     <p class="hero-sub">Paste a URL. Get a researched brief, a dual-host script, and rendered audio.</p>
   </header>
 
-  <form class="home-form" action="/projects" method="POST">
+  <div class="source-tabs" id="sourceTabs">
+    <button type="button" class="source-tab active" data-mode="url" onclick="switchSourceMode('url')">🌐 From URL</button>
+    <button type="button" class="source-tab" data-mode="file" onclick="switchSourceMode('file')">📄 Upload File</button>
+  </div>
 
-    <div class="url-field">
+  <div id="sourceErrorMsg" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:6px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:13px"></div>
+
+  <form class="home-form" id="homeForm" action="/projects" method="POST">
+
+    <div class="url-field" id="urlSection">
       <input
         type="url"
         name="url"
+        id="urlInput"
         placeholder="https://paste-any-article-url-here.com/…"
         required
         autofocus
@@ -23,6 +31,18 @@
         spellcheck="false"
       />
       <button type="submit" class="btn-generate">
+        Generate
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="url-field" id="fileSection" style="display:none;flex-direction:column;align-items:stretch;gap:8px">
+      <label for="fileInput" class="file-drop-area">
+        <span id="fileLabel">Choose a PDF, TXT, or MD file…</span>
+        <input type="file" name="file" id="fileInput" accept=".pdf,.txt,.md" style="display:none" onchange="onFileSelected(this)">
+      </label>
+      <p style="font-size:12px;color:#94a3b8;margin:0">Max 10 MB. Scanned PDFs (image-only) cannot be extracted.</p>
+      <button type="submit" class="btn-generate" style="align-self:flex-end">
         Generate
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -95,4 +115,45 @@
   </form>
 
 </div>
+
+<script>
+function switchSourceMode(mode) {
+  const urlSection = document.getElementById('urlSection');
+  const fileSection = document.getElementById('fileSection');
+  const urlInput = document.getElementById('urlInput');
+  const fileInput = document.getElementById('fileInput');
+  const form = document.getElementById('homeForm');
+  document.querySelectorAll('.source-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  if (mode === 'url') {
+    urlSection.style.display = '';
+    fileSection.style.display = 'none';
+    urlInput.required = true;
+    fileInput.required = false;
+    form.action = '/projects';
+    form.enctype = 'application/x-www-form-urlencoded';
+  } else {
+    urlSection.style.display = 'none';
+    fileSection.style.display = 'flex';
+    urlInput.required = false;
+    fileInput.required = true;
+    form.action = '/projects/from-file';
+    form.enctype = 'multipart/form-data';
+  }
+  document.getElementById('sourceErrorMsg').style.display = 'none';
+}
+
+function onFileSelected(input) {
+  const label = document.getElementById('fileLabel');
+  const area = input.closest('.file-drop-area');
+  if (input.files && input.files[0]) {
+    const f = input.files[0];
+    const kb = (f.size / 1024).toFixed(0);
+    label.textContent = f.name + ' (' + kb + ' KB)';
+    area.classList.add('has-file');
+  } else {
+    label.textContent = 'Choose a PDF, TXT, or MD file\u2026';
+    area.classList.remove('has-file');
+  }
+}
+</script>
 {% endblock %}

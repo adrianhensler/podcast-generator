@@ -289,6 +289,41 @@ a:hover { color: var(--text); }
   line-height: 1.65;
 }
 
+/* Source mode tabs */
+.source-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.source-tab {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.source-tab:hover { color: var(--text); }
+.source-tab.active { background: var(--amber); color: #0a0807; border-color: var(--amber); font-weight: 600; }
+
+.file-drop-area {
+  display: block;
+  padding: 20px;
+  background: var(--surface);
+  border: 2px dashed var(--border-light);
+  border-radius: var(--r);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.2s, color 0.2s;
+}
+.file-drop-area:hover { border-color: var(--amber); color: var(--text); }
+.file-drop-area.has-file { border-style: solid; border-color: var(--amber); color: var(--text); }
+
 /* URL form */
 .home-form {
   display: flex;

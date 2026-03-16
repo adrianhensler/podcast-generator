@@ -1,14 +1,14 @@
 import logging
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db, SessionLocal
 from app.models import Project, StageLog
 from app.services import source_ingest, research_generator, script_generator
-from app.services.source_ingest import IngestionError
+from app.services.source_ingest import IngestionError, extract_upload
 from app.services.script_generator import ScriptParseError
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,65 @@ async def create_project(
     return response
 
 
+@router.post("/projects/from-file")
+async def create_project_from_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    num_speakers: int = Form(2),
+    tone: str = Form("neutral"),
+    length: str = Form("medium"),
+    host_a_voice: str = Form("Wise_Woman"),
+    host_b_voice: str = Form("Deep_Voice_Man"),
+    db: Session = Depends(get_db),
+):
+    MAX = 10 * 1024 * 1024
+    data = await file.read(MAX + 1)
+    if len(data) > MAX:
+        return JSONResponse({"error": "File too large (max 10 MB)"}, status_code=413)
+    try:
+        content = extract_upload(file.filename, data)
+    except IngestionError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
+
+    project = Project(
+        url=f"upload://{file.filename}",
+        title=file.filename,
+        num_speakers=num_speakers,
+        tone=tone,
+        length=length,
+        host_a_voice=host_a_voice,
+        host_b_voice=host_b_voice,
+        status="pending",
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    background_tasks.add_task(run_ingest_from_content, project.id, content)
+    return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
+
+
+@router.post("/projects/{project_id}/ingest-content")
+async def ingest_content(
+    project_id: str,
+    body: dict,
+    db: Session = Depends(get_db),
+):
+    project = db.get(Project, project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    content = body.get("content", "")
+    if len(content) < 200:
+        project.status = "error"
+        project.error_message = "Provided content too short (< 200 chars)"
+        db.commit()
+        return JSONResponse({"error": "Content too short"}, status_code=422)
+    from app.services.storage import write_artifact
+    await write_artifact(project_id, "normalized_sources.md", content)
+    project.status = "brief_pending"
+    db.commit()
+    return JSONResponse({"status": "brief_pending"})
+
+
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
 async def project_page(project_id: str, request: Request, db: Session = Depends(get_db)):
     from app.main import templates
@@ -82,6 +141,17 @@ async def project_list(request: Request, page: int = 1, db: Session = Depends(ge
         request, "partials/project_list.html",
         {"projects": projects, "page": page, "has_next": has_next},
     )
+
+
+@router.get("/projects/{project_id}/cost")
+async def project_cost(project_id: str, db: Session = Depends(get_db)):
+    project = db.get(Project, project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    return JSONResponse({
+        "estimated_cost_usd": round(project.estimated_cost_usd or 0, 5),
+        "total_tokens": project.total_tokens or 0,
+    })
 
 
 @router.get("/projects/{project_id}/status/json")
@@ -153,6 +223,28 @@ async def render_audio(
 
 
 # --- Background task functions (each creates its own DB session) ---
+
+async def run_ingest_from_content(project_id: str, content: str):
+    """Write pre-extracted content as normalized_sources.md → set brief_pending."""
+    db = SessionLocal()
+    try:
+        project = db.get(Project, project_id)
+        if not project:
+            return
+        project.status = "ingesting"
+        db.commit()
+        try:
+            from app.services.storage import write_artifact
+            await write_artifact(project_id, "normalized_sources.md", content)
+        except Exception as e:
+            _set_error(db, project, f"Failed to write upload content: {e}")
+            return
+        project.status = "brief_pending"
+        db.commit()
+        logger.info("Project %s: brief_pending (from upload)", project_id)
+    finally:
+        db.close()
+
 
 async def run_ingest_only(project_id: str):
     """Ingest URL → set brief_pending. Browser then opens SSE stream for brief."""
