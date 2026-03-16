@@ -98,6 +98,40 @@ async def create_project_from_file(
     return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
 
 
+@router.post("/projects/from-text")
+async def create_project_from_text(
+    background_tasks: BackgroundTasks,
+    content: str = Form(...),
+    num_speakers: int = Form(2),
+    tone: str = Form("neutral"),
+    length: str = Form("medium"),
+    host_a_voice: str = Form("Wise_Woman"),
+    host_b_voice: str = Form("Deep_Voice_Man"),
+    db: Session = Depends(get_db),
+):
+    MAX_CHARS = 50_000
+    if len(content) > MAX_CHARS:
+        return JSONResponse({"error": f"Text too long (max {MAX_CHARS:,} characters)"}, status_code=413)
+    if len(content.strip()) < 200:
+        return JSONResponse({"error": f"Text too short ({len(content.strip())} chars; minimum 200)."}, status_code=422)
+
+    project = Project(
+        url="paste://text",
+        title="Pasted text",
+        num_speakers=num_speakers,
+        tone=tone,
+        length=length,
+        host_a_voice=host_a_voice,
+        host_b_voice=host_b_voice,
+        status="pending",
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    background_tasks.add_task(run_ingest_from_content, project.id, content)
+    return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
+
+
 @router.post("/projects/{project_id}/ingest-content")
 async def ingest_content(
     project_id: str,

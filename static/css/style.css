@@ -324,6 +324,32 @@ a:hover { color: var(--text); }
 .file-drop-area:hover { border-color: var(--amber); color: var(--text); }
 .file-drop-area.has-file { border-style: solid; border-color: var(--amber); color: var(--text); }
 
+.paste-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 14px 18px;
+  resize: vertical;
+  min-height: 180px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.paste-input:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-glow); }
+.paste-input::placeholder { color: var(--text-dim); }
+
+.paste-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* URL form */
 .home-form {
   display: flex;

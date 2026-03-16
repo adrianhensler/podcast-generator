@@ -12,6 +12,7 @@
   <div class="source-tabs" id="sourceTabs">
     <button type="button" class="source-tab active" data-mode="url" onclick="switchSourceMode('url')">🌐 From URL</button>
     <button type="button" class="source-tab" data-mode="file" onclick="switchSourceMode('file')">📄 Upload File</button>
+    <button type="button" class="source-tab" data-mode="text" onclick="switchSourceMode('text')">📝 Paste Text</button>
   </div>
 
   <div id="sourceErrorMsg" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:6px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;font-size:13px"></div>
@@ -34,6 +35,24 @@
         Generate
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
+    </div>
+
+    <div id="textSection" style="display:none">
+      <textarea
+        name="content"
+        id="pasteInput"
+        class="paste-input"
+        placeholder="Paste your article, research paper, or any text here…"
+        rows="10"
+        maxlength="50000"
+      ></textarea>
+      <div class="paste-meta">
+        <span id="pasteCharCount">0 / 50,000</span>
+        <button type="submit" class="btn-generate">
+          Generate
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="url-field" id="fileSection" style="display:none;flex-direction:column;align-items:stretch;gap:8px">
@@ -120,27 +139,34 @@
 function switchSourceMode(mode) {
   const urlSection = document.getElementById('urlSection');
   const fileSection = document.getElementById('fileSection');
+  const textSection = document.getElementById('textSection');
   const urlInput = document.getElementById('urlInput');
   const fileInput = document.getElementById('fileInput');
   const form = document.getElementById('homeForm');
   document.querySelectorAll('.source-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  urlSection.style.display = mode === 'url' ? '' : 'none';
+  fileSection.style.display = mode === 'file' ? 'flex' : 'none';
+  textSection.style.display = mode === 'text' ? '' : 'none';
+  urlInput.required = mode === 'url';
+  fileInput.required = mode === 'file';
+  document.getElementById('pasteInput').required = mode === 'text';
   if (mode === 'url') {
-    urlSection.style.display = '';
-    fileSection.style.display = 'none';
-    urlInput.required = true;
-    fileInput.required = false;
     form.action = '/projects';
     form.enctype = 'application/x-www-form-urlencoded';
-  } else {
-    urlSection.style.display = 'none';
-    fileSection.style.display = 'flex';
-    urlInput.required = false;
-    fileInput.required = true;
+  } else if (mode === 'file') {
     form.action = '/projects/from-file';
     form.enctype = 'multipart/form-data';
+  } else {
+    form.action = '/projects/from-text';
+    form.enctype = 'application/x-www-form-urlencoded';
   }
   document.getElementById('sourceErrorMsg').style.display = 'none';
 }
+
+document.getElementById('pasteInput').addEventListener('input', function() {
+  const n = this.value.length;
+  document.getElementById('pasteCharCount').textContent = n.toLocaleString() + ' / 50,000';
+});
 
 function onFileSelected(input) {
   const label = document.getElementById('fileLabel');
