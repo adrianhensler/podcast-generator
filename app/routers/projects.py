@@ -177,6 +177,25 @@ async def project_list(request: Request, page: int = 1, db: Session = Depends(ge
     )
 
 
+@router.get("/projects/{project_id}/cost/stages")
+async def project_cost_stages(project_id: str, db: Session = Depends(get_db)):
+    project = db.get(Project, project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    logs = db.query(StageLog).filter(StageLog.project_id == project_id).order_by(StageLog.id).all()
+    return JSONResponse([
+        {
+            "stage": log.stage,
+            "model": log.model,
+            "prompt_tokens": log.prompt_tokens,
+            "completion_tokens": log.completion_tokens,
+            "cost_usd": round(log.cost_usd or 0, 6),
+            "duration_ms": log.duration_ms,
+        }
+        for log in logs
+    ])
+
+
 @router.get("/projects/{project_id}/cost")
 async def project_cost(project_id: str, db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
