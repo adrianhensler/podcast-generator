@@ -37,6 +37,7 @@ async def create_project(
     use_tavily: bool = Form(False),
     host_a_voice: str = Form("Wise_Woman"),
     host_b_voice: str = Form("Deep_Voice_Man"),
+    language: str = Form("English"),
     db: Session = Depends(get_db),
 ):
     project = Project(
@@ -48,6 +49,7 @@ async def create_project(
         use_tavily=use_tavily,
         host_a_voice=host_a_voice,
         host_b_voice=host_b_voice,
+        language=language,
         status="pending",
     )
     db.add(project)
@@ -348,7 +350,8 @@ async def run_script_outline(project_id: str):
         target_words = script_generator.LENGTH_TARGETS.get(project.length, 1500)
         try:
             outline_json, log = await script_generator._generate_outline(
-                brief, project.num_speakers, project.tone, target_words
+                brief, project.num_speakers, project.tone, target_words,
+                language=getattr(project, "language", "English"),
             )
         except Exception as e:
             _set_error(db, project, f"Outline generation error: {e}")
@@ -402,7 +405,8 @@ async def run_tts_render(project_id: str, tts_model: str = "turbo"):
         t0 = _time.monotonic()
         try:
             audio_path, total_chars = await render(
-                project_id, lines, project.host_a_voice, project.host_b_voice, api_url
+                project_id, lines, project.host_a_voice, project.host_b_voice, api_url,
+                language=getattr(project, "language", "English"),
             )
         except Exception as e:
             _set_error(db, project, f"Audio render error: {e}")

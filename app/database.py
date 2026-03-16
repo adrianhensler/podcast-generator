@@ -29,6 +29,7 @@ def init_db():
     with engine.connect() as conn:
         for stmt in [
             "ALTER TABLE stage_logs ADD COLUMN thinking TEXT",
+            "ALTER TABLE projects ADD COLUMN language VARCHAR(32) DEFAULT 'English'",
         ]:
             try:
                 conn.execute(text(stmt))

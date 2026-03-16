@@ -59,6 +59,7 @@ async def render(
     host_a_voice: str = "Wise_Woman",
     host_b_voice: str = "Deep_Voice_Man",
     api_url: str = REPLICATE_API_URL_TURBO,
+    language: str = "English",
 ) -> tuple[str, int]:
     """Render all script lines to audio segments, stitch, return (path, total_chars)."""
     seg_dir = segments_dir(project_id)
@@ -71,7 +72,7 @@ async def render(
         normalized_text = normalize_for_speech(line.text)
         seg_path = seg_dir / f"seg_{idx:04d}.mp3"
         async with semaphore:
-            await _render_segment(normalized_text, voice, seg_path, api_url)
+            await _render_segment(normalized_text, voice, seg_path, api_url, language)
         return seg_path, len(normalized_text)
 
     tasks = [render_line(i, line) for i, line in enumerate(script_lines)]
@@ -87,7 +88,7 @@ async def render(
     return str(audio_mp3), total_chars
 
 
-async def _render_segment(text: str, voice_id: str, output_path: Path, api_url: str = REPLICATE_API_URL_TURBO) -> None:
+async def _render_segment(text: str, voice_id: str, output_path: Path, api_url: str = REPLICATE_API_URL_TURBO, language: str = "English") -> None:
     headers = {
         "Authorization": f"Bearer {settings.replicate_api_token}",
         "Content-Type": "application/json",
@@ -101,7 +102,7 @@ async def _render_segment(text: str, voice_id: str, output_path: Path, api_url: 
             "channel": "mono",
             "bitrate": 128000,
             "audio_format": "mp3",
-            "language_boost": "English",
+            "language_boost": language,
             "emotion": "auto",
         }
     }

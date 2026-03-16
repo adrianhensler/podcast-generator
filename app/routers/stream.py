@@ -131,7 +131,8 @@ async def _stream_brief(project_id: str):
 
         source_content = source_path.read_text(encoding="utf-8")
         system_prompt, user_prompt = research_generator.build_brief_prompt(
-            project.url, source_content, project.tone, project.length
+            project.url, source_content, project.tone, project.length,
+            language=getattr(project, "language", "English"),
         )
 
         gen = llm_stream(
@@ -208,7 +209,8 @@ async def _stream_script(project_id: str):
             outline_dict = {}
 
         system_prompt, user_prompt = script_generator.build_expand_prompt(
-            brief, outline_dict, project.num_speakers, project.tone, project.length
+            brief, outline_dict, project.num_speakers, project.tone, project.length,
+            language=getattr(project, "language", "English"),
         )
 
         gen = llm_stream(

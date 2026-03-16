@@ -17,7 +17,13 @@ Rules:
 - Focus on what matters most for an informed listener."""
 
 
-def build_brief_prompt(url: str, source_content: str, tone: str, length: str) -> tuple[str, str]:
+def _lang_instruction(language: str) -> str:
+    if language and language.lower() not in ("english", "auto", ""):
+        return f"Write all output in {language}.\n"
+    return ""
+
+
+def build_brief_prompt(url: str, source_content: str, tone: str, length: str, language: str = "English") -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for brief generation."""
     target_words = LENGTH_WORDS.get(length, 600)
     tone_instruction = {
@@ -26,7 +32,9 @@ def build_brief_prompt(url: str, source_content: str, tone: str, length: str) ->
         "neutral": "Present all sides objectively without editorial slant.",
     }.get(tone, "Present all sides objectively.")
 
-    user_prompt = f"""Source URL: {url}
+    lang_prefix = _lang_instruction(language)
+
+    user_prompt = f"""{lang_prefix}Source URL: {url}
 
 Source Content:
 {source_content}
@@ -51,9 +59,10 @@ async def generate(
     source_content: str,
     tone: str = "neutral",
     length: str = "medium",
+    language: str = "English",
 ) -> tuple[str, StageLogData]:
     """Generate a research brief from source content. Returns (brief_text, stage_log)."""
-    system_prompt, user_prompt = build_brief_prompt(url, source_content, tone, length)
+    system_prompt, user_prompt = build_brief_prompt(url, source_content, tone, length, language)
 
     brief, log = await llm_complete(
         model=settings.model_outline,

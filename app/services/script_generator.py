@@ -14,6 +14,12 @@ LENGTH_TARGETS = {"short": 800, "medium": 1500, "long": 2500}
 OUTLINE_SYSTEM = """You are a podcast producer creating episode outlines.
 Output valid JSON only. No markdown, no preamble."""
 
+
+def _lang_instruction(language: str) -> str:
+    if language and language.lower() not in ("english", "auto", ""):
+        return f"Write all output in {language}.\n"
+    return ""
+
 EXPAND_SYSTEM = """You are a podcast scriptwriter producing natural, spoken dialogue.
 Rules:
 - Write in natural spoken language only.
@@ -62,7 +68,7 @@ async def generate(
 
 
 async def _generate_outline(
-    brief: str, num_speakers: int, tone: str, target_words: int
+    brief: str, num_speakers: int, tone: str, target_words: int, language: str = "English"
 ) -> tuple[str, StageLogData]:
     speaker_note = "one host" if num_speakers == 1 else "two hosts (Host A and Host B)"
     tone_note = {
@@ -71,7 +77,9 @@ async def _generate_outline(
         "neutral": "balanced and objective",
     }.get(tone, "balanced")
 
-    prompt = f"""Create a podcast episode outline for {speaker_note} in a {tone_note} style.
+    lang_note = f"Write all segment text in {language}. " if language.lower() not in ("english", "auto", "") else ""
+
+    prompt = f"""{_lang_instruction(language)}Create a podcast episode outline for {speaker_note} in a {tone_note} style.
 Target script length: ~{target_words} words.
 
 Research Brief:
@@ -84,7 +92,8 @@ Return a JSON object with this structure:
   "key_points": ["point 1", "point 2", "point 3", "point 4"],
   "risks_caveats": ["caveat 1", "caveat 2"],
   "next_steps": ["action 1", "action 2"]
-}}"""
+}}
+{lang_note}"""
 
     content, log = await llm_complete(
         model=settings.model_outline,
@@ -101,7 +110,7 @@ Return a JSON object with this structure:
 
 
 def build_expand_prompt(
-    brief: str, outline_dict: dict, num_speakers: int, tone: str, length: str
+    brief: str, outline_dict: dict, num_speakers: int, tone: str, length: str, language: str = "English"
 ) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for script expansion."""
     target_words = LENGTH_TARGETS.get(length, 1500)
@@ -116,7 +125,7 @@ Host A introduces topics and asks questions. Host B provides analysis and commen
 Natural back-and-forth — not monologues. Each speaker contributes meaningfully."""
         persona_desc = "Host A is curious and accessible. Host B is analytical and direct."
 
-    prompt = f"""Expand this outline into a full podcast script of approximately {target_words} words.
+    prompt = f"""{_lang_instruction(language)}Expand this outline into a full podcast script of approximately {target_words} words.
 
 {persona_desc}
 
@@ -135,7 +144,7 @@ Every factual claim must come from the research brief above."""
 
 
 async def _expand_to_script(
-    brief: str, outline_json: str, num_speakers: int, tone: str, length: str
+    brief: str, outline_json: str, num_speakers: int, tone: str, length: str, language: str = "English"
 ) -> tuple[str, StageLogData]:
     try:
         outline = json.loads(outline_json)
@@ -144,7 +153,7 @@ async def _expand_to_script(
         match = re.search(r'\{.*\}', outline_json or '', re.DOTALL)
         outline = json.loads(match.group()) if match else {}
 
-    system_prompt, prompt = build_expand_prompt(brief, outline, num_speakers, tone, length)
+    system_prompt, prompt = build_expand_prompt(brief, outline, num_speakers, tone, length, language)
 
     script, log = await llm_complete(
         model=settings.model_expand,
