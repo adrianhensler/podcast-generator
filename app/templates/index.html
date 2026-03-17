@@ -148,6 +148,7 @@ function switchSourceMode(mode) {
   fileSection.style.display = mode === 'file' ? 'flex' : 'none';
   textSection.style.display = mode === 'text' ? '' : 'none';
   urlInput.required = mode === 'url';
+  urlInput.disabled = mode !== 'url';
   fileInput.required = mode === 'file';
   document.getElementById('pasteInput').required = mode === 'text';
   if (mode === 'url') {
