@@ -49,8 +49,15 @@ def _strip_thinking(raw: str) -> tuple[str, str | None]:
     return content, thinking
 
 
-async def _run_stream(llm_gen, project_id: str, filename: str, db, project, terminal_status: str | None = None):
-    """Shared tail: yield token SSE events, suppress <think> tokens, save to disk, commit."""
+async def _run_stream(llm_gen, project_id: str, filename: str, db, project, terminal_status: str | None = None,
+                      emit_expand_done: bool = False):
+    """Shared tail: yield token SSE events, suppress <think> tokens, save to disk, commit.
+
+    terminal_status: if set, project.status is updated and "done" is emitted.
+    emit_expand_done: if True (and terminal_status is None), emits "expand_done" instead of "done"
+                      to signal that more pipeline steps follow; the stream stays open.
+                      When both are False/None, emits "done" (used by revision streams).
+    """
     accumulated = []
     log = None
     in_thinking = False
@@ -103,9 +110,10 @@ async def _run_stream(llm_gen, project_id: str, filename: str, db, project, term
     if terminal_status:
         project.status = terminal_status
     db.commit()
-    # Emit "expand_done" when terminal_status is None (more pipeline steps follow),
-    # so the browser stream stays open; emit "done" when this is the final step.
-    yield _sse({"type": "done" if terminal_status else "expand_done"})
+    if emit_expand_done:
+        yield _sse({"type": "expand_done"})
+    else:
+        yield _sse({"type": "done"})
 
 
 async def _stream_brief(project_id: str):
@@ -229,7 +237,8 @@ async def _stream_script(project_id: str):
         )
         # Expand stream — save to script.md but don't set terminal status yet;
         # outro generation runs next before we mark script_ready.
-        async for event in _run_stream(gen, project_id, "script.md", db, project, terminal_status=None):
+        async for event in _run_stream(gen, project_id, "script.md", db, project,
+                                       terminal_status=None, emit_expand_done=True):
             yield event
 
         # ── Outro generation ──────────────────────────────────────────────────
@@ -237,6 +246,7 @@ async def _stream_script(project_id: str):
         # context, generate a proper outro that callbacks to the hook, then
         # write the final script back to disk.
         yield _sse({"type": "outro_start"})
+        final_script = None
         try:
             script_path = Path(settings.output_dir) / project_id / "script.md"
             draft_script = script_path.read_text(encoding="utf-8")
@@ -256,6 +266,10 @@ async def _stream_script(project_id: str):
         except Exception as e:
             # Outro failure is non-fatal — the expand script is still valid.
             logger.warning("Outro generation failed for %s, keeping expand script: %s", project_id, e)
+
+        # Emit the final script so the browser textarea reflects the outro rewrite.
+        if final_script is not None:
+            yield _sse({"type": "final_content", "text": final_script})
 
         project.status = "script_ready"
         db.commit()
