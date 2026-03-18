@@ -266,11 +266,14 @@ async def _stream_script(project_id: str):
         except Exception as e:
             # Outro failure is non-fatal — the expand script is still valid.
             logger.warning("Outro generation failed for %s, keeping expand script: %s", project_id, e)
-
-        # Commit script_ready before any yields — a disconnected client must not
-        # prevent this from running.
-        project.status = "script_ready"
-        db.commit()
+        finally:
+            # Guaranteed to run even on CancelledError (BaseException) from
+            # Starlette task cancellation when the Celery worker disconnects.
+            project.status = "script_ready"
+            try:
+                db.commit()
+            except Exception:
+                pass
 
         # Remaining yields are for the browser UI only; Celery worker has already
         # disconnected. GeneratorExit here is harmless — status is already set.
