@@ -103,7 +103,9 @@ async def _run_stream(llm_gen, project_id: str, filename: str, db, project, term
     if terminal_status:
         project.status = terminal_status
     db.commit()
-    yield _sse({"type": "done"})
+    # Emit "expand_done" when terminal_status is None (more pipeline steps follow),
+    # so the browser stream stays open; emit "done" when this is the final step.
+    yield _sse({"type": "done" if terminal_status else "expand_done"})
 
 
 async def _stream_brief(project_id: str):
@@ -225,8 +227,39 @@ async def _stream_script(project_id: str):
             max_tokens=6000,
             stage_label="expand",
         )
-        async for event in _run_stream(gen, project_id, "script.md", db, project, "script_ready"):
+        # Expand stream — save to script.md but don't set terminal status yet;
+        # outro generation runs next before we mark script_ready.
+        async for event in _run_stream(gen, project_id, "script.md", db, project, terminal_status=None):
             yield event
+
+        # ── Outro generation ──────────────────────────────────────────────────
+        # Read the just-written draft script, split off the last few turns as
+        # context, generate a proper outro that callbacks to the hook, then
+        # write the final script back to disk.
+        yield _sse({"type": "outro_start"})
+        try:
+            script_path = Path(settings.output_dir) / project_id / "script.md"
+            draft_script = script_path.read_text(encoding="utf-8")
+            body, draft_outro = script_generator._split_script_body_and_draft_outro(draft_script)
+
+            outro_text, outro_log = await script_generator.generate_outro(
+                outline_dict,
+                draft_outro,
+                project.num_speakers,
+                flow_type=getattr(project, "flow_type", "explainer"),
+                language=getattr(project, "language", "English"),
+            )
+
+            final_script = body + "\n" + outro_text if body else outro_text
+            await write_artifact(project_id, "script.md", final_script)
+            _save_log(db, project, outro_log)
+        except Exception as e:
+            # Outro failure is non-fatal — the expand script is still valid.
+            logger.warning("Outro generation failed for %s, keeping expand script: %s", project_id, e)
+
+        project.status = "script_ready"
+        db.commit()
+        yield _sse({"type": "done"})
 
     except Exception as e:
         logger.error("Script stream error for %s: %s", project_id, e)
