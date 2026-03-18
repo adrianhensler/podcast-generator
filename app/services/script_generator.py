@@ -249,6 +249,124 @@ async def _expand_to_script(
     return script, log
 
 
+OUTRO_SYSTEM = """You are a podcast scriptwriter writing a closing segment for a podcast episode.
+Rules:
+- Write in natural spoken language only.
+- Spell out ALL numbers and figures.
+- No markdown: no asterisks, headers, bullet points, hyphens as bullets.
+- No symbols: no $, %, #, &, @, →, —.
+- No URLs or domain names.
+- Keep lines to 1-3 sentences per turn.
+- Each speaker turn must start with exactly "Host A:" or "Host B:" on its own line.
+- Do NOT use filler sign-offs like "that's all for today", "thanks for listening", or "see you next time"."""
+
+# Flow-specific outro instructions
+_FLOW_OUTRO_INSTRUCTION: dict[str, str] = {
+    "explainer": "Summarise the single clearest takeaway, then give the listener one concrete thing to do or think about.",
+    "review": "Deliver a clear verdict — do not hedge or say 'it depends'. State what the listener should do with this information.",
+    "debate": "Each host briefly restates their position in one sentence. Do not force consensus — let the disagreement stand.",
+    "interview": "The interviewer thanks the expert and lands the single most memorable insight from the conversation.",
+    "deep_dive": "Pull out the most significant implication of the evidence. Give the listener a precise next step grounded in the facts discussed.",
+}
+
+# Number of trailing script turns to treat as draft outro context (replaced by generated outro)
+_OUTRO_CONTEXT_TURNS = 5
+
+
+def _split_script_body_and_draft_outro(script: str, n_turns: int = _OUTRO_CONTEXT_TURNS) -> tuple[str, str]:
+    """Split script into (body, draft_outro).
+
+    Body is everything except the last n_turns speaker turns.
+    Draft outro is the last n_turns turns — used as context for generation, not kept verbatim.
+    Returns (body_text, draft_outro_text).
+    """
+    pattern = re.compile(r'(?m)^(Host [AB]:.*(?:\n(?!Host [AB]:).+)*)', re.MULTILINE)
+    turns = list(pattern.finditer(script))
+
+    if len(turns) <= n_turns:
+        # Script is very short — use the whole thing as context, body is empty
+        return "", script
+
+    split_pos = turns[-n_turns].start()
+    return script[:split_pos].rstrip(), script[split_pos:]
+
+
+def build_outro_prompt(
+    hook: str,
+    key_points: list[str],
+    next_steps: list[str],
+    draft_outro: str,
+    num_speakers: int,
+    flow_type: str = DEFAULT_FLOW,
+    language: str = "English",
+) -> tuple[str, str]:
+    """Return (system_prompt, user_prompt) for outro generation."""
+    flow_cfg = FLOW_CONFIGS.get(flow_type, FLOW_CONFIGS[DEFAULT_FLOW])
+    outro_instruction = _FLOW_OUTRO_INSTRUCTION.get(flow_type, _FLOW_OUTRO_INSTRUCTION["explainer"])
+
+    if num_speakers == 1:
+        format_note = 'Format: every line starts with "Host A:" — no Host B lines.'
+        persona_note = "Host A is wrapping up the episode."
+    else:
+        format_note = 'Format: alternate "Host A:" and "Host B:" lines, 3-6 turns total.'
+        persona_note = f"{flow_cfg['persona_a']} {flow_cfg['persona_b']}"
+
+    kp_text = "\n".join(f"- {p}" for p in key_points) if key_points else "(none)"
+    ns_text = "\n".join(f"- {s}" for s in next_steps) if next_steps else "(none)"
+    lang_prefix = _lang_instruction(language)
+
+    user_prompt = f"""{lang_prefix}Write a closing outro segment for this podcast episode (~150 words, {format_note}).
+
+Opening hook the episode started with:
+{hook}
+
+Key points covered:
+{kp_text}
+
+Planned next steps / listener actions:
+{ns_text}
+
+How the episode was ending (draft — rewrite this into a proper outro, do not copy it verbatim):
+{draft_outro}
+
+Outro instruction for this episode format: {outro_instruction}
+
+{persona_note}
+
+Callback to the opening hook. Land the sharpest conclusion. Deliver a concrete takeaway. End cleanly."""
+
+    return OUTRO_SYSTEM, user_prompt
+
+
+async def generate_outro(
+    outline_dict: dict,
+    draft_outro: str,
+    num_speakers: int,
+    flow_type: str = DEFAULT_FLOW,
+    language: str = "English",
+) -> tuple[str, StageLogData]:
+    """Generate a replacement outro from the draft ending and outline context."""
+    hook = outline_dict.get("hook", "")
+    key_points = outline_dict.get("key_points", [])
+    next_steps = outline_dict.get("next_steps", [])
+
+    system_prompt, user_prompt = build_outro_prompt(
+        hook, key_points, next_steps, draft_outro, num_speakers, flow_type, language
+    )
+
+    outro, log = await llm_complete(
+        model=settings.model_outline,  # fast/cheap model is fine for a short focused pass
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.7,
+        max_tokens=600,
+        stage_label="outro",
+    )
+    return outro.strip(), log
+
+
 def parse_script_lines(script: str) -> list[ScriptLine]:
     """Parse Host A:/Host B: lines from script text."""
     pattern = re.compile(r'^\s*(Host [AB]):\s*(.+?)\s*$', re.MULTILINE)
