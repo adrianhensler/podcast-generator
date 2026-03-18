@@ -11,12 +11,13 @@ class Settings(BaseSettings):
     replicate_concurrency: int = 5
 
     # LLM models
-    model_outline: str = "qwen/qwen3.5-397b-a17b"
+    model_outline: str = "qwen/qwen3.5-35b-a3b"
     model_expand: str = "z-ai/glm-5"
 
     # Pricing table (per 1M tokens, USD)
     model_pricing: dict = Field(default={
-        "qwen/qwen3.5-397b-a17b": {"input": 0.14, "output": 0.14},
+        "qwen/qwen3.5-35b-a3b": {"input": 0.14, "output": 1.30},
+        "qwen/qwen3.5-397b-a17b": {"input": 0.14, "output": 2.34},
         "z-ai/glm-5": {"input": 0.72, "output": 2.30},
         "z-ai/glm-4.7": {"input": 0.38, "output": 1.98},
     })
