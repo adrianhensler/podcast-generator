@@ -242,10 +242,10 @@ async def _stream_script(project_id: str):
             yield event
 
         # ── Outro generation ──────────────────────────────────────────────────
-        # Read the just-written draft script, split off the last few turns as
-        # context, generate a proper outro that callbacks to the hook, then
-        # write the final script back to disk.
-        yield _sse({"type": "outro_start"})
+        # IMPORTANT: Run outro and commit status BEFORE any yields.
+        # The Celery worker disconnects after receiving expand_done, so any
+        # yield after that point raises GeneratorExit (BaseException — not caught
+        # by except Exception). Status must be committed before we yield again.
         final_script = None
         try:
             script_path = Path(settings.output_dir) / project_id / "script.md"
@@ -267,12 +267,16 @@ async def _stream_script(project_id: str):
             # Outro failure is non-fatal — the expand script is still valid.
             logger.warning("Outro generation failed for %s, keeping expand script: %s", project_id, e)
 
-        # Emit the final script so the browser textarea reflects the outro rewrite.
-        if final_script is not None:
-            yield _sse({"type": "final_content", "text": final_script})
-
+        # Commit script_ready before any yields — a disconnected client must not
+        # prevent this from running.
         project.status = "script_ready"
         db.commit()
+
+        # Remaining yields are for the browser UI only; Celery worker has already
+        # disconnected. GeneratorExit here is harmless — status is already set.
+        yield _sse({"type": "outro_start"})
+        if final_script is not None:
+            yield _sse({"type": "final_content", "text": final_script})
         yield _sse({"type": "done"})
 
     except Exception as e:
