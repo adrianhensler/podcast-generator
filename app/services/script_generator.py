@@ -32,6 +32,77 @@ Rules:
 - Keep lines to natural speech segments (1-3 sentences per turn).
 - Each speaker turn must start with exactly "Host A:" or "Host B:" on its own line."""
 
+# Per-flow-type prompt configuration.
+# Each entry controls: outline framing, host personas, and speaker interaction rules.
+FLOW_CONFIGS: dict[str, dict] = {
+    "explainer": {
+        "label": "Explainer",
+        "outline_framing": "A clear, accessible explanation for a general audience. Build understanding step by step.",
+        "persona_a": "Host A is curious and accessible, asking the questions a thoughtful listener would ask.",
+        "persona_b": "Host B is knowledgeable and clear, explaining concepts without jargon.",
+        "speaker_instruction": (
+            "Host A introduces topics and asks questions. Host B provides explanation and context. "
+            "Natural back-and-forth — not monologues."
+        ),
+    },
+    "review": {
+        "label": "Review / Analysis",
+        "outline_framing": (
+            "A structured review and evaluation. The hook should frame the core question being evaluated. "
+            "key_points should cover strengths, weaknesses, and signals pointing toward a verdict."
+        ),
+        "persona_a": "Host A is a skeptic who probes for weaknesses and asks hard questions.",
+        "persona_b": "Host B is an analyst who weighs evidence and builds toward a clear verdict.",
+        "speaker_instruction": (
+            "Hosts critically evaluate the subject together. Work toward a clear verdict or recommendation. "
+            "The outro must deliver a concrete conclusion — not 'it depends'."
+        ),
+    },
+    "debate": {
+        "label": "Debate",
+        "outline_framing": (
+            "A structured debate. Host A argues FOR the central proposition. Host B argues AGAINST it. "
+            "key_points should list the strongest arguments from each side."
+        ),
+        "persona_a": "Host A is an advocate FOR the central proposition — argues it confidently and marshals supporting evidence.",
+        "persona_b": "Host B argues AGAINST the central proposition — challenges assumptions and raises counterpoints.",
+        "speaker_instruction": (
+            "Hosts actively disagree and challenge each other's claims. "
+            "Each host should push back directly when the other makes a point. "
+            "End with each host briefly restating their position."
+        ),
+    },
+    "interview": {
+        "label": "Interview",
+        "outline_framing": (
+            "An interview format. questions should be the prepared interview questions Host A will ask. "
+            "key_points are the core insights Host B (the expert) will convey through their answers."
+        ),
+        "persona_a": "Host A is the interviewer — asks prepared, probing questions and follows up naturally on interesting answers.",
+        "persona_b": "Host B is the subject-matter expert — answers from deep knowledge, adds context the interviewer didn't ask for.",
+        "speaker_instruction": (
+            "Host A asks questions only — no lectures or long explanations from the interviewer. "
+            "Host B provides answers and elaborates freely. Host A may follow up but stays in the questioning role."
+        ),
+    },
+    "deep_dive": {
+        "label": "Deep Dive",
+        "outline_framing": (
+            "A thorough, evidence-forward deep dive for a knowledgeable audience. "
+            "key_points should be specific, evidence-based claims. risks_caveats should be detailed and precise."
+        ),
+        "persona_a": "Host A is a researcher who has read everything and asks precise, detailed questions about mechanisms and evidence.",
+        "persona_b": "Host B is a domain expert who goes deep on underlying mechanisms, data quality, and nuanced implications.",
+        "speaker_instruction": (
+            "Both hosts go deep. Cite specific facts and figures from the brief. "
+            "Use longer turns — this is serious analysis, not banter. "
+            "Prioritize accuracy and depth over entertainment value."
+        ),
+    },
+}
+
+DEFAULT_FLOW = "explainer"
+
 
 class ScriptParseError(Exception):
     pass
@@ -49,17 +120,18 @@ async def generate(
     num_speakers: int = 2,
     tone: str = "neutral",
     length: str = "medium",
+    flow_type: str = DEFAULT_FLOW,
 ) -> tuple[str, list[StageLogData]]:
     """Two-stage script generation. Returns (script_text, [stage_logs])."""
     target_words = LENGTH_TARGETS.get(length, 1500)
     logs = []
 
     # Stage A: Outline
-    outline_json, log_a = await _generate_outline(brief, num_speakers, tone, target_words)
+    outline_json, log_a = await _generate_outline(brief, num_speakers, tone, target_words, flow_type=flow_type)
     logs.append(log_a)
 
     # Stage B: Expand
-    script, log_b = await _expand_to_script(brief, outline_json, num_speakers, tone, length)
+    script, log_b = await _expand_to_script(brief, outline_json, num_speakers, tone, length, flow_type=flow_type)
     logs.append(log_b)
 
     file_path = await write_artifact(project_id, "script.md", script)
@@ -68,7 +140,8 @@ async def generate(
 
 
 async def _generate_outline(
-    brief: str, num_speakers: int, tone: str, target_words: int, language: str = "English"
+    brief: str, num_speakers: int, tone: str, target_words: int, language: str = "English",
+    flow_type: str = DEFAULT_FLOW,
 ) -> tuple[str, StageLogData]:
     speaker_note = "one host" if num_speakers == 1 else "two hosts (Host A and Host B)"
     tone_note = {
@@ -77,9 +150,11 @@ async def _generate_outline(
         "neutral": "balanced and objective",
     }.get(tone, "balanced")
 
+    flow_cfg = FLOW_CONFIGS.get(flow_type, FLOW_CONFIGS[DEFAULT_FLOW])
     lang_note = f"Write all segment text in {language}. " if language.lower() not in ("english", "auto", "") else ""
 
     prompt = f"""{_lang_instruction(language)}Create a podcast episode outline for {speaker_note} in a {tone_note} style.
+Episode format: {flow_cfg["outline_framing"]}
 Target script length: ~{target_words} words.
 
 Research Brief:
@@ -110,20 +185,25 @@ Return a JSON object with this structure:
 
 
 def build_expand_prompt(
-    brief: str, outline_dict: dict, num_speakers: int, tone: str, length: str, language: str = "English"
+    brief: str, outline_dict: dict, num_speakers: int, tone: str, length: str, language: str = "English",
+    flow_type: str = DEFAULT_FLOW,
 ) -> tuple[str, str]:
     """Return (system_prompt, user_prompt) for script expansion."""
     target_words = LENGTH_TARGETS.get(length, 1500)
+
+    flow_cfg = FLOW_CONFIGS.get(flow_type, FLOW_CONFIGS[DEFAULT_FLOW])
 
     if num_speakers == 1:
         speaker_instruction = """Format: Every line starts with "Host A:" followed by the dialogue.
 No Host B lines. Host A speaks continuously, using natural transitions."""
         persona_desc = "Host A is knowledgeable, engaging, and speaks directly to the listener."
     else:
-        speaker_instruction = """Format: Alternate between "Host A:" and "Host B:" lines.
-Host A introduces topics and asks questions. Host B provides analysis and commentary.
-Natural back-and-forth — not monologues. Each speaker contributes meaningfully."""
-        persona_desc = "Host A is curious and accessible. Host B is analytical and direct."
+        speaker_instruction = (
+            f'Format: Alternate between "Host A:" and "Host B:" lines.\n'
+            f"{flow_cfg['speaker_instruction']}\n"
+            "Each speaker turn must start on its own line with exactly \"Host A:\" or \"Host B:\"."
+        )
+        persona_desc = f"{flow_cfg['persona_a']} {flow_cfg['persona_b']}"
 
     prompt = f"""{_lang_instruction(language)}Expand this outline into a full podcast script of approximately {target_words} words.
 
@@ -144,7 +224,8 @@ Every factual claim must come from the research brief above."""
 
 
 async def _expand_to_script(
-    brief: str, outline_json: str, num_speakers: int, tone: str, length: str, language: str = "English"
+    brief: str, outline_json: str, num_speakers: int, tone: str, length: str, language: str = "English",
+    flow_type: str = DEFAULT_FLOW,
 ) -> tuple[str, StageLogData]:
     try:
         outline = json.loads(outline_json)
@@ -153,7 +234,7 @@ async def _expand_to_script(
         match = re.search(r'\{.*\}', outline_json or '', re.DOTALL)
         outline = json.loads(match.group()) if match else {}
 
-    system_prompt, prompt = build_expand_prompt(brief, outline, num_speakers, tone, length, language)
+    system_prompt, prompt = build_expand_prompt(brief, outline, num_speakers, tone, length, language, flow_type=flow_type)
 
     script, log = await llm_complete(
         model=settings.model_expand,

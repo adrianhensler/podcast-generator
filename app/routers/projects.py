@@ -38,6 +38,7 @@ async def create_project(
     host_a_voice: str = Form("Wise_Woman"),
     host_b_voice: str = Form("Deep_Voice_Man"),
     language: str = Form("English"),
+    flow_type: str = Form("explainer"),
     db: Session = Depends(get_db),
 ):
     project = Project(
@@ -50,6 +51,7 @@ async def create_project(
         host_a_voice=host_a_voice,
         host_b_voice=host_b_voice,
         language=language,
+        flow_type=flow_type,
         status="pending",
     )
     db.add(project)
@@ -72,6 +74,7 @@ async def create_project_from_file(
     length: str = Form("medium"),
     host_a_voice: str = Form("Wise_Woman"),
     host_b_voice: str = Form("Deep_Voice_Man"),
+    flow_type: str = Form("explainer"),
     db: Session = Depends(get_db),
 ):
     MAX = 10 * 1024 * 1024
@@ -91,6 +94,7 @@ async def create_project_from_file(
         length=length,
         host_a_voice=host_a_voice,
         host_b_voice=host_b_voice,
+        flow_type=flow_type,
         status="pending",
     )
     db.add(project)
@@ -109,6 +113,7 @@ async def create_project_from_text(
     length: str = Form("medium"),
     host_a_voice: str = Form("Wise_Woman"),
     host_b_voice: str = Form("Deep_Voice_Man"),
+    flow_type: str = Form("explainer"),
     db: Session = Depends(get_db),
 ):
     MAX_CHARS = 50_000
@@ -125,6 +130,7 @@ async def create_project_from_text(
         length=length,
         host_a_voice=host_a_voice,
         host_b_voice=host_b_voice,
+        flow_type=flow_type,
         status="pending",
     )
     db.add(project)
@@ -352,6 +358,7 @@ async def run_script_outline(project_id: str):
             outline_json, log = await script_generator._generate_outline(
                 brief, project.num_speakers, project.tone, target_words,
                 language=getattr(project, "language", "English"),
+                flow_type=getattr(project, "flow_type", "explainer"),
             )
         except Exception as e:
             _set_error(db, project, f"Outline generation error: {e}")
