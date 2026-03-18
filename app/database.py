@@ -30,6 +30,7 @@ def init_db():
         for stmt in [
             "ALTER TABLE stage_logs ADD COLUMN thinking TEXT",
             "ALTER TABLE projects ADD COLUMN language VARCHAR(32) DEFAULT 'English'",
+            "ALTER TABLE projects ADD COLUMN flow_type VARCHAR(32) DEFAULT 'explainer'",
         ]:
             try:
                 conn.execute(text(stmt))

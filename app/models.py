@@ -20,6 +20,7 @@ class Project(Base):
     length: Mapped[str] = mapped_column(String(16), default="medium")
     use_tavily: Mapped[bool] = mapped_column(Boolean, default=False)
     language: Mapped[str] = mapped_column(String(32), default="English")
+    flow_type: Mapped[str] = mapped_column(String(32), default="explainer")
     total_tokens: Mapped[int] = mapped_column(Integer, default=0)
     estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
