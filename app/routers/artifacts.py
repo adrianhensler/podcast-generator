@@ -12,7 +12,7 @@ from app.models import Project
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-VALID_TYPES = {"normalized_sources", "research_brief", "script"}
+VALID_TYPES = {"normalized_sources", "research_brief", "script", "outline", "tavily_results"}
 
 
 def _get_artifact_path(project_id: str, artifact_type: str) -> Path:
@@ -21,6 +21,8 @@ def _get_artifact_path(project_id: str, artifact_type: str) -> Path:
         "normalized_sources": "normalized_sources.md",
         "research_brief": "research_brief.md",
         "script": "script.md",
+        "outline": "outline.json",
+        "tavily_results": "tavily_results.md",
     }
     filename = filename_map.get(artifact_type)
     if not filename:

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from urllib.parse import urlparse
 
 import httpx
 
@@ -17,6 +18,7 @@ async def ingest(project_id: str, url: str, use_tavily: bool = False) -> str:
     """
     Fetch and extract text from URL. Optionally augment with Tavily search.
     Returns the normalized source content and writes normalized_sources.md.
+    Tavily results are written to a separate tavily_results.md artifact.
     """
     # Try httpx with browser headers first (works on sites that block headless fetchers)
     content = await _httpx_extract(url)
@@ -34,13 +36,59 @@ async def ingest(project_id: str, url: str, use_tavily: bool = False) -> str:
         )
 
     if use_tavily:
-        tavily_content = await _tavily_augment(url)
+        query = await _generate_tavily_query(content[:500], url)
+        tavily_content = await _tavily_augment(url, query)
         if tavily_content:
-            content = content + "\n\n---\n\n## Additional Context (Tavily)\n\n" + tavily_content
+            await write_artifact(project_id, "tavily_results.md", tavily_content)
+            logger.info("Wrote tavily_results.md for project %s", project_id)
 
     file_path = await write_artifact(project_id, "normalized_sources.md", content)
     logger.info("Ingested %d chars from %s → %s", len(content), url, file_path)
     return content
+
+
+async def ingest_tavily_only(project_id: str, url: str, normalized_sources_preview: str) -> str:
+    """Re-run Tavily search for an existing project. Overwrites tavily_results.md.
+    Returns the new tavily content (or empty string if nothing found)."""
+    query = await _generate_tavily_query(normalized_sources_preview[:500], url)
+    tavily_content = await _tavily_augment(url, query)
+    if tavily_content:
+        await write_artifact(project_id, "tavily_results.md", tavily_content)
+        logger.info("Re-ran Tavily for project %s → %d chars", project_id, len(tavily_content))
+    return tavily_content or ""
+
+
+async def _generate_tavily_query(content_preview: str, url: str) -> str:
+    """Generate a focused 2-3 keyword search query using the LLM. Falls back to URL slug."""
+    try:
+        from app.services.llm_client import llm_complete
+        content, _ = await llm_complete(
+            model=settings.model_outline,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"Article excerpt:\n{content_preview}\n\n"
+                        "Generate a 2-3 keyword search query capturing what this article is about. "
+                        "Return only the query, nothing else."
+                    ),
+                }
+            ],
+            temperature=0.3,
+            max_tokens=32,
+            stage_label="tavily_query",
+        )
+        query = content.strip().strip('"').strip("'")
+        if query:
+            logger.info("LLM-generated Tavily query: %r", query)
+            return query
+    except Exception as e:
+        logger.warning("Tavily query generation failed, using URL slug fallback: %s", e)
+
+    # Fallback: slug from URL path
+    parsed = urlparse(url)
+    slug = parsed.path.rstrip("/").split("/")[-1].replace("-", " ").replace("_", " ").strip()
+    return slug or parsed.netloc
 
 
 BROWSER_HEADERS = {
@@ -131,25 +179,20 @@ async def _httpx_extract(url: str) -> str | None:
         return None
 
 
-async def _tavily_augment(url: str) -> str | None:
+async def _tavily_augment(url: str, query: str) -> str | None:
     api_key = settings.tavily_api_key
     if not api_key:
         logger.warning("use_tavily=True but TAVILY_API_KEY not configured; skipping")
         return None
 
     try:
-        # Extract a search query from the URL domain/path
-        from urllib.parse import urlparse
-        parsed = urlparse(url)
-        query = f"site:{parsed.netloc} {parsed.path.replace('/', ' ').strip()}"
-
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.tavily.com/search",
                 json={
                     "api_key": api_key,
                     "query": query,
-                    "search_depth": "basic",
+                    "search_depth": "advanced",
                     "include_answer": True,
                     "max_results": 5,
                 },

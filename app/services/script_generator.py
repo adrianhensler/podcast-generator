@@ -367,6 +367,60 @@ async def generate_outro(
     return outro.strip(), log
 
 
+EDITOR_SYSTEM = """You are a podcast script editor performing a coherence and polish pass.
+Rules:
+- Maintain the exact "Host A:" / "Host B:" line format — never change speaker labels.
+- Do not add new factual claims. Do not remove key points.
+- Polish only: improve flow, remove repetition, smooth awkward transitions.
+- Ensure the outro connects back to the opening hook.
+- Return the complete revised script only — no commentary, no preamble."""
+
+
+async def editor_pass(
+    project_id: str,
+    script: str,
+    brief: str,
+    tavily_content: str,
+    flow_type: str,
+    length: str,
+) -> tuple[str, StageLogData]:
+    """Polish pass for medium/long episodes. Returns (edited_script, log).
+    Short episodes are returned unchanged (no stage log is written)."""
+    if length == "short":
+        # Return a dummy log so callers don't have to branch
+        dummy_log = StageLogData(
+            stage="editor", model="skipped", prompt_tokens=0, completion_tokens=0,
+            cost_usd=0.0, duration_ms=0,
+        )
+        return script, dummy_log
+
+    tavily_instruction = ""
+    if tavily_content and tavily_content.strip():
+        tavily_instruction = (
+            "\n\nFor any claims not directly supported by the research brief below, "
+            "soften them with hedges like 'reportedly' or 'according to sources'. "
+            "Do NOT add any new claims."
+        )
+
+    user_prompt = (
+        f"Polish this {flow_type} podcast script for coherence and flow.{tavily_instruction}\n\n"
+        f"Research Brief (authoritative source):\n{brief[:3000]}\n\n"
+        f"Script to edit:\n{script}"
+    )
+
+    edited, log = await llm_complete(
+        model=settings.model_outline,
+        messages=[
+            {"role": "system", "content": EDITOR_SYSTEM},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.3,
+        max_tokens=6000,
+        stage_label="editor",
+    )
+    return edited.strip() or script, log
+
+
 def parse_script_lines(script: str) -> list[ScriptLine]:
     """Parse Host A:/Host B: lines from script text."""
     pattern = re.compile(r'^\s*(Host [AB]):\s*(.+?)\s*$', re.MULTILINE)

@@ -140,6 +140,18 @@ async def _stream_brief(project_id: str):
             return
 
         source_content = source_path.read_text(encoding="utf-8")
+
+        # Append Tavily results if available (stored separately since Chunk A)
+        tavily_path = Path(settings.output_dir) / project_id / "tavily_results.md"
+        if tavily_path.exists():
+            tavily_text = tavily_path.read_text(encoding="utf-8")
+            if tavily_text.strip():
+                source_content = (
+                    source_content
+                    + "\n\n---\n\n## Additional Context (Tavily)\n\n"
+                    + tavily_text
+                )
+
         system_prompt, user_prompt = research_generator.build_brief_prompt(
             project.url, source_content, project.tone, project.length,
             language=getattr(project, "language", "English"),
@@ -263,6 +275,30 @@ async def _stream_script(project_id: str):
             final_script = body + "\n" + outro_text if body else outro_text
             await write_artifact(project_id, "script.md", final_script)
             _save_log(db, project, outro_log)
+
+            # ── Editor pass ───────────────────────────────────────────────
+            try:
+                tavily_path = Path(settings.output_dir) / project_id / "tavily_results.md"
+                tavily_content = ""
+                if tavily_path.exists():
+                    tavily_content = tavily_path.read_text(encoding="utf-8")
+
+                edited_script, editor_log = await script_generator.editor_pass(
+                    project_id=project_id,
+                    script=final_script,
+                    brief=brief,
+                    tavily_content=tavily_content,
+                    flow_type=getattr(project, "flow_type", "explainer"),
+                    length=project.length,
+                )
+                if editor_log.model != "skipped":
+                    await write_artifact(project_id, "script.md", edited_script)
+                    final_script = edited_script
+                    _save_log(db, project, editor_log)
+                    logger.info("Editor pass complete for %s", project_id)
+            except Exception as editor_err:
+                logger.warning("Editor pass failed for %s, keeping outro script: %s", project_id, editor_err)
+
         except Exception as e:
             # Outro failure is non-fatal — the expand script is still valid.
             logger.warning("Outro generation failed for %s, keeping expand script: %s", project_id, e)

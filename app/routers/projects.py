@@ -253,6 +253,51 @@ async def generate_script(
     return resp
 
 
+@router.post("/projects/{project_id}/retavily")
+async def retavily(project_id: str, db: Session = Depends(get_db)):
+    """Re-run Tavily search for an existing project without regenerating the full pipeline."""
+    project = db.get(Project, project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    if not project.use_tavily:
+        return JSONResponse({"error": "Project was not created with use_tavily=True"}, status_code=400)
+    if not project.url or project.url.startswith(("upload://", "paste://")):
+        return JSONResponse({"error": "Tavily requires a web URL source"}, status_code=400)
+
+    from pathlib import Path
+    from app.config import settings as app_settings
+
+    sources_path = Path(app_settings.output_dir) / project_id / "normalized_sources.md"
+    sources_preview = ""
+    if sources_path.exists():
+        sources_preview = sources_path.read_text(encoding="utf-8")[:500]
+
+    try:
+        new_content = await source_ingest.ingest_tavily_only(project_id, project.url, sources_preview)
+    except Exception as e:
+        logger.warning("Retavily failed for %s: %s", project_id, e)
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    return JSONResponse({"status": "ok", "chars": len(new_content)})
+
+
+@router.get("/projects/{project_id}/metadata")
+async def project_metadata(project_id: str, db: Session = Depends(get_db)):
+    """Return flow type metadata for a project (used by share page)."""
+    project = db.get(Project, project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    flow_type = getattr(project, "flow_type", "explainer") or "explainer"
+    flow_cfg = script_generator.FLOW_CONFIGS.get(flow_type, script_generator.FLOW_CONFIGS[script_generator.DEFAULT_FLOW])
+    return JSONResponse({
+        "flow_type": flow_type,
+        "num_speakers": project.num_speakers,
+        "persona_a": flow_cfg["persona_a"],
+        "persona_b": flow_cfg["persona_b"],
+        "label": flow_cfg["label"],
+    })
+
+
 @router.post("/projects/{project_id}/render")
 async def render_audio(
     project_id: str,
