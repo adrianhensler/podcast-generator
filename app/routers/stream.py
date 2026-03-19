@@ -308,8 +308,16 @@ async def _stream_script(project_id: str):
             project.status = "script_ready"
             try:
                 db.commit()
-            except Exception:
-                pass
+            except Exception as commit_err:
+                logger.error(
+                    "Failed to commit script_ready for %s: %s — project may be stuck in script_streaming",
+                    project_id, commit_err,
+                )
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                raise
 
         # Remaining yields are for the browser UI only; Celery worker has already
         # disconnected. GeneratorExit here is harmless — status is already set.
