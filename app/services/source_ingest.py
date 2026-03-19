@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -14,10 +15,10 @@ class IngestionError(Exception):
     pass
 
 
-async def ingest(project_id: str, url: str, use_tavily: bool = False) -> str:
+async def ingest(project_id: str, url: str, use_tavily: bool = False) -> tuple[str, list]:
     """
     Fetch and extract text from URL. Optionally augment with Tavily search.
-    Returns the normalized source content and writes normalized_sources.md.
+    Returns (normalized_source_content, stage_logs) and writes normalized_sources.md.
     Tavily results are written to a separate tavily_results.md artifact.
     """
     # Try httpx with browser headers first (works on sites that block headless fetchers)
@@ -35,8 +36,11 @@ async def ingest(project_id: str, url: str, use_tavily: bool = False) -> str:
             f"Extracted: {len(content or '')} chars (minimum 200 required)."
         )
 
+    stage_logs = []
     if use_tavily:
-        query = await _generate_tavily_query(content[:500], url)
+        query, query_log = await _generate_tavily_query(content[:500], url)
+        if query_log:
+            stage_logs.append(query_log)
         tavily_content = await _tavily_augment(url, query)
         if tavily_content:
             await write_artifact(project_id, "tavily_results.md", tavily_content)
@@ -44,25 +48,33 @@ async def ingest(project_id: str, url: str, use_tavily: bool = False) -> str:
 
     file_path = await write_artifact(project_id, "normalized_sources.md", content)
     logger.info("Ingested %d chars from %s → %s", len(content), url, file_path)
-    return content
+    return content, stage_logs
 
 
-async def ingest_tavily_only(project_id: str, url: str, normalized_sources_preview: str) -> str:
-    """Re-run Tavily search for an existing project. Overwrites tavily_results.md.
-    Returns the new tavily content (or empty string if nothing found)."""
-    query = await _generate_tavily_query(normalized_sources_preview[:500], url)
+async def ingest_tavily_only(project_id: str, url: str, normalized_sources_preview: str) -> tuple[str, list]:
+    """Re-run Tavily search for an existing project. Overwrites (or clears) tavily_results.md.
+    Returns (tavily_content, stage_logs) — content is empty string if nothing found."""
+    query, query_log = await _generate_tavily_query(normalized_sources_preview[:500], url)
+    stage_logs = [query_log] if query_log else []
     tavily_content = await _tavily_augment(url, query)
+    stale_path = Path(settings.output_dir) / project_id / "tavily_results.md"
     if tavily_content:
         await write_artifact(project_id, "tavily_results.md", tavily_content)
         logger.info("Re-ran Tavily for project %s → %d chars", project_id, len(tavily_content))
-    return tavily_content or ""
+    else:
+        # Clear stale artifact so downstream doesn't use outdated data
+        if stale_path.exists():
+            stale_path.unlink()
+            logger.info("Cleared stale tavily_results.md for project %s (re-run returned no content)", project_id)
+    return tavily_content or "", stage_logs
 
 
-async def _generate_tavily_query(content_preview: str, url: str) -> str:
-    """Generate a focused 2-3 keyword search query using the LLM. Falls back to URL slug."""
+async def _generate_tavily_query(content_preview: str, url: str) -> tuple[str, object]:
+    """Generate a focused 2-3 keyword search query using the LLM. Falls back to URL slug.
+    Returns (query, StageLogData_or_None)."""
     try:
         from app.services.llm_client import llm_complete
-        content, _ = await llm_complete(
+        content, log = await llm_complete(
             model=settings.model_outline,
             messages=[
                 {
@@ -81,14 +93,14 @@ async def _generate_tavily_query(content_preview: str, url: str) -> str:
         query = content.strip().strip('"').strip("'")
         if query:
             logger.info("LLM-generated Tavily query: %r", query)
-            return query
+            return query, log
     except Exception as e:
         logger.warning("Tavily query generation failed, using URL slug fallback: %s", e)
 
-    # Fallback: slug from URL path
+    # Fallback: slug from URL path (no LLM cost to track)
     parsed = urlparse(url)
     slug = parsed.path.rstrip("/").split("/")[-1].replace("-", " ").replace("_", " ").strip()
-    return slug or parsed.netloc
+    return slug or parsed.netloc, None
 
 
 BROWSER_HEADERS = {

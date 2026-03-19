@@ -11,6 +11,7 @@ from app.database import SessionLocal
 from app.models import Project, StageLog
 from app.services.llm_client import llm_stream
 from app.services import research_generator, script_generator
+from app.services.script_generator import ScriptParseError
 from app.services.storage import write_artifact
 
 logger = logging.getLogger(__name__)
@@ -292,10 +293,20 @@ async def _stream_script(project_id: str):
                     length=project.length,
                 )
                 if editor_log.model != "skipped":
-                    await write_artifact(project_id, "script.md", edited_script)
-                    final_script = edited_script
-                    _save_log(db, project, editor_log)
-                    logger.info("Editor pass complete for %s", project_id)
+                    # Validate Host A:/Host B: format before persisting — a malformed
+                    # editor output would block TTS rendering downstream.
+                    try:
+                        script_generator.parse_script_lines(edited_script)
+                    except ScriptParseError as parse_err:
+                        logger.warning(
+                            "Editor pass produced invalid script format for %s: %s — keeping pre-edit script",
+                            project_id, parse_err,
+                        )
+                    else:
+                        await write_artifact(project_id, "script.md", edited_script)
+                        final_script = edited_script
+                        _save_log(db, project, editor_log)
+                        logger.info("Editor pass complete for %s", project_id)
             except Exception as editor_err:
                 logger.warning("Editor pass failed for %s, keeping outro script: %s", project_id, editor_err)
 

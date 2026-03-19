@@ -273,10 +273,14 @@ async def retavily(project_id: str, db: Session = Depends(get_db)):
         sources_preview = sources_path.read_text(encoding="utf-8")[:500]
 
     try:
-        new_content = await source_ingest.ingest_tavily_only(project_id, project.url, sources_preview)
+        new_content, retavily_logs = await source_ingest.ingest_tavily_only(project_id, project.url, sources_preview)
     except Exception as e:
         logger.warning("Retavily failed for %s: %s", project_id, e)
         return JSONResponse({"error": str(e)}, status_code=502)
+
+    for log in retavily_logs:
+        _save_log(db, project, log)
+    db.commit()
 
     return JSONResponse({"status": "ok", "chars": len(new_content)})
 
@@ -363,7 +367,7 @@ async def run_ingest_only(project_id: str):
         project.status = "ingesting"
         db.commit()
         try:
-            source_content = await source_ingest.ingest(
+            source_content, ingest_logs = await source_ingest.ingest(
                 project_id, project.url, project.use_tavily
             )
         except IngestionError as e:
@@ -372,6 +376,9 @@ async def run_ingest_only(project_id: str):
         except Exception as e:
             _set_error(db, project, f"Ingestion error: {e}")
             return
+
+        for log in ingest_logs:
+            _save_log(db, project, log)
 
         project.status = "brief_pending"
         db.commit()
