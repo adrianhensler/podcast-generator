@@ -11,6 +11,7 @@ from app.database import SessionLocal
 from app.models import Project, StageLog
 from app.services.llm_client import llm_stream
 from app.services import research_generator, script_generator
+from app.services.script_generator import ScriptParseError
 from app.services.storage import write_artifact
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,18 @@ async def _stream_brief(project_id: str):
             return
 
         source_content = source_path.read_text(encoding="utf-8")
+
+        # Append Tavily results if available (stored separately since Chunk A)
+        tavily_path = Path(settings.output_dir) / project_id / "tavily_results.md"
+        if tavily_path.exists():
+            tavily_text = tavily_path.read_text(encoding="utf-8")
+            if tavily_text.strip():
+                source_content = (
+                    source_content
+                    + "\n\n---\n\n## Additional Context (Tavily)\n\n"
+                    + tavily_text
+                )
+
         system_prompt, user_prompt = research_generator.build_brief_prompt(
             project.url, source_content, project.tone, project.length,
             language=getattr(project, "language", "English"),
@@ -263,6 +276,40 @@ async def _stream_script(project_id: str):
             final_script = body + "\n" + outro_text if body else outro_text
             await write_artifact(project_id, "script.md", final_script)
             _save_log(db, project, outro_log)
+
+            # ── Editor pass ───────────────────────────────────────────────
+            try:
+                tavily_path = Path(settings.output_dir) / project_id / "tavily_results.md"
+                tavily_content = ""
+                if tavily_path.exists():
+                    tavily_content = tavily_path.read_text(encoding="utf-8")
+
+                edited_script, editor_log = await script_generator.editor_pass(
+                    project_id=project_id,
+                    script=final_script,
+                    brief=brief,
+                    tavily_content=tavily_content,
+                    flow_type=getattr(project, "flow_type", "explainer"),
+                    length=project.length,
+                )
+                if editor_log.model != "skipped":
+                    # Validate Host A:/Host B: format before persisting — a malformed
+                    # editor output would block TTS rendering downstream.
+                    try:
+                        script_generator.parse_script_lines(edited_script)
+                    except ScriptParseError as parse_err:
+                        logger.warning(
+                            "Editor pass produced invalid script format for %s: %s — keeping pre-edit script",
+                            project_id, parse_err,
+                        )
+                    else:
+                        await write_artifact(project_id, "script.md", edited_script)
+                        final_script = edited_script
+                        _save_log(db, project, editor_log)
+                        logger.info("Editor pass complete for %s", project_id)
+            except Exception as editor_err:
+                logger.warning("Editor pass failed for %s, keeping outro script: %s", project_id, editor_err)
+
         except Exception as e:
             # Outro failure is non-fatal — the expand script is still valid.
             logger.warning("Outro generation failed for %s, keeping expand script: %s", project_id, e)
@@ -272,8 +319,16 @@ async def _stream_script(project_id: str):
             project.status = "script_ready"
             try:
                 db.commit()
-            except Exception:
-                pass
+            except Exception as commit_err:
+                logger.error(
+                    "Failed to commit script_ready for %s: %s — project may be stuck in script_streaming",
+                    project_id, commit_err,
+                )
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                raise
 
         # Remaining yields are for the browser UI only; Celery worker has already
         # disconnected. GeneratorExit here is harmless — status is already set.
