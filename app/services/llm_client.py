@@ -92,7 +92,7 @@ async def llm_complete(
             model, stage_label, max_tokens,
         )
 
-    if not content.strip():
+    if not content:
         raise LLMError(
             f"Stage '{stage_label}' produced empty content "
             f"(completion_tokens={completion_tokens}, max_tokens={max_tokens}). "
@@ -141,6 +141,7 @@ async def llm_stream(
     start = time.monotonic()
     prompt_tokens = 0
     completion_tokens = 0
+    content_yielded = False
 
     async with httpx.AsyncClient(timeout=300.0) as client:
         async with client.stream("POST", OPENROUTER_API_URL, headers=headers, json=payload) as resp:
@@ -162,6 +163,7 @@ async def llm_stream(
                 delta = chunk.get("choices", [{}])[0].get("delta", {})
                 token = delta.get("content") or ""
                 if token:
+                    content_yielded = True
                     yield token
 
                 # Capture usage from last chunk (OpenRouter sends it there)
@@ -171,6 +173,18 @@ async def llm_stream(
                     completion_tokens = usage.get("completion_tokens", 0)
 
     duration_ms = int((time.monotonic() - start) * 1000)
+    truncated = completion_tokens >= max_tokens
+    if truncated:
+        logger.warning(
+            "LLM stream [%s] stage=%s hit max_tokens limit (%d) — output may be truncated",
+            model, stage_label, max_tokens,
+        )
+    if not content_yielded:
+        raise LLMError(
+            f"Stage '{stage_label}' produced empty content "
+            f"(completion_tokens={completion_tokens}, max_tokens={max_tokens}). "
+            "The model may have exhausted its token budget on internal reasoning."
+        )
     cost = _estimate_cost(model, prompt_tokens, completion_tokens)
     log = StageLogData(
         stage=stage_label,
@@ -179,6 +193,7 @@ async def llm_stream(
         completion_tokens=completion_tokens,
         cost_usd=cost,
         duration_ms=duration_ms,
+        truncated=truncated,
     )
     logger.info(
         "LLM stream [%s] stage=%s tokens=%d+%d cost=$%.4f dur=%dms",
