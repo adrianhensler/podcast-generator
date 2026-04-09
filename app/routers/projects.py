@@ -504,6 +504,7 @@ def _save_log(db, project, log):
         duration_ms=log.duration_ms,
         error=log.error,
         thinking=log.thinking,
+        truncated=log.truncated,
     )
     db.add(stage_log)
     project.total_tokens += log.prompt_tokens + log.completion_tokens
