@@ -177,7 +177,7 @@ Return a JSON object with this structure:
             {"role": "user", "content": prompt},
         ],
         temperature=0.4,
-        max_tokens=2048,
+        max_tokens=4096,
         stage_label="outline",
         response_format={"type": "json_object"},
     )
