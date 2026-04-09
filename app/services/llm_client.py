@@ -28,6 +28,7 @@ class StageLogData:
     duration_ms: int
     error: str | None = None
     thinking: str | None = None
+    truncated: bool = False
 
 
 def _estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
@@ -84,6 +85,20 @@ async def llm_complete(
     completion_tokens = usage.get("completion_tokens", 0)
     cost = _estimate_cost(model, prompt_tokens, completion_tokens)
 
+    truncated = completion_tokens >= max_tokens
+    if truncated:
+        logger.warning(
+            "LLM [%s] stage=%s hit max_tokens limit (%d) — output may be truncated",
+            model, stage_label, max_tokens,
+        )
+
+    if not content.strip():
+        raise LLMError(
+            f"Stage '{stage_label}' produced empty content "
+            f"(completion_tokens={completion_tokens}, max_tokens={max_tokens}). "
+            "The model may have exhausted its token budget on internal reasoning."
+        )
+
     log = StageLogData(
         stage=stage_label,
         model=model,
@@ -92,6 +107,7 @@ async def llm_complete(
         cost_usd=cost,
         duration_ms=duration_ms,
         thinking=thinking,
+        truncated=truncated,
     )
     logger.info(
         "LLM [%s] stage=%s tokens=%d+%d cost=$%.4f dur=%dms",
