@@ -177,7 +177,7 @@ Return a JSON object with this structure:
             {"role": "user", "content": prompt},
         ],
         temperature=0.4,
-        max_tokens=4096,
+        max_tokens=8192,
         stage_label="outline",
         response_format={"type": "json_object"},
     )
@@ -243,7 +243,7 @@ async def _expand_to_script(
             {"role": "user", "content": prompt},
         ],
         temperature=0.8,
-        max_tokens=6000,
+        max_tokens=16000,
         stage_label="expand",
     )
     return script, log
@@ -361,7 +361,7 @@ async def generate_outro(
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.7,
-        max_tokens=600,
+        max_tokens=8192,
         stage_label="outro",
     )
     return outro.strip(), log
@@ -415,7 +415,7 @@ async def editor_pass(
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.3,
-        max_tokens=6000,
+        max_tokens=16000,
         stage_label="editor",
     )
     return edited.strip() or script, log
