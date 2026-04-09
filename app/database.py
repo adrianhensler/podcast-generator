@@ -31,6 +31,7 @@ def init_db():
             "ALTER TABLE stage_logs ADD COLUMN thinking TEXT",
             "ALTER TABLE projects ADD COLUMN language VARCHAR(32) DEFAULT 'English'",
             "ALTER TABLE projects ADD COLUMN flow_type VARCHAR(32) DEFAULT 'explainer'",
+            "ALTER TABLE stage_logs ADD COLUMN truncated BOOLEAN DEFAULT 0",
         ]:
             try:
                 conn.execute(text(stmt))
