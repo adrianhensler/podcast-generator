@@ -253,6 +253,28 @@ async def generate_script(
     return resp
 
 
+@router.post("/projects/{project_id}/run-pipeline")
+async def run_pipeline_endpoint(
+    project_id: str,
+    body: dict,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Start the self-driving pipeline for a project. Posts webhook callbacks at each stage."""
+    project = db.get(Project, project_id)
+    if not project:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    callback_url = body.get("callback_url") or None
+    if callback_url:
+        project.callback_url = callback_url
+        db.commit()
+
+    from app.services.pipeline import run_pipeline
+    background_tasks.add_task(run_pipeline, project_id, callback_url)
+    return JSONResponse({"status": "started"})
+
+
 @router.post("/projects/{project_id}/retavily")
 async def retavily(project_id: str, db: Session = Depends(get_db)):
     """Re-run Tavily search for an existing project without regenerating the full pipeline."""
